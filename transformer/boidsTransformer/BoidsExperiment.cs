@@ -46,35 +46,50 @@ namespace boidsTransformer
         /// <summary>
         /// Creates a BoidsExperiment from a boids log file.
         /// </summary>
-        /// <remarks>
-        /// REGEX: <see href="https://regex101.com/r/2eIGmk/6/"/>
-        /// Instead of using the convenience function, the beginning of a proper setup would look something like:
-        /// FileStream input = File.OpenRead(inputFile);
-        /// Span<byte> inputBuffer; // Alternative consideration if this were a more serious project.
-        /// </remarks>
         /// <param name="inputFile">The file the experiment can be found in.</param>
         public BoidsExperiment(string inputFile)
         {
             string[] snapshotsRaw = File.ReadAllLines(inputFile); // Convenience function
 
+            InitializeSnapshot(snapshotsRaw);
+            
+        }
+
+        /// <summary>
+        /// Initializes the boids experiment from a serialized representation.
+        /// </summary>
+        /// <param name="rawSnapshots">A serialized representation of the snapshot conforming to <see href="https://regex101.com/r/2eIGmk/6/"/>. May have multiple lines.</param>
+        public BoidsExperiment(string[] rawSnapshots) => InitializeSnapshot(rawSnapshots);
+
+        /// <summary>
+        /// Initializes the boids experiment from a serialized representation.
+        /// </summary>
+        /// <remarks>
+        /// Instead of using the convenience function, the beginning of a proper setup would look something like:
+        /// FileStream input = File.OpenRead(inputFile);
+        /// Span<byte> inputBuffer; // Alternative consideration if this were a more serious project.
+        /// </remarks>
+        /// <param name="snapshotsRaw">A serialized representation of the snapshot conforming to <see href="https://regex101.com/r/2eIGmk/6/"/>.  May have multiple lines.</param>
+        protected void InitializeSnapshot(string[] snapshotsRaw)
+        {
             Current = new List<BoidsSnapshot>();
 
             // Reads the snapshot as a whole.
-            Regex snapshotReader = new Regex(@"(?<time>[\d\.]+):(?:(?:[\d\.]+),(?:[\d\.]+);)*",
+            Regex snapshotReader = new Regex(@"(?<time>[\d\.\-]+):(?:(?:[\d\.]+),(?:[\d\.]+);)*",
                 RegexOptions.Compiled | RegexOptions.IgnoreCase);
             // Reads each ordered pair in the snapshot.
             Regex orderedPairFinder = new Regex(@"(?<coordx>[\d\.]+),(?<coordy>[\d\.]+);",
                 RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+
             for (int i = 0; i < snapshotsRaw.Length; i++)
             { // For each snapshot
-
                 // Get the overallsnapshat data.
                 if (snapshotsRaw.Equals("") && i == snapshotsRaw.Length - 1) return; // Allow blank line at EOF.
                 Match parsedSnapshot = snapshotReader.Match(snapshotsRaw[i]);
-                if(!parsedSnapshot.Success)
+                if (!parsedSnapshot.Success)
                 {
-                    string err = "Could not interpret line " + i + " of " + inputFile + ".";
+                    string err = "Could not interpret line " + i + " of input.";
                     Console.WriteLine(err);
                     throw new ArgumentException(err);
                 }
@@ -85,18 +100,19 @@ namespace boidsTransformer
                 List<float[]> pairs = new List<float[]>();
 
                 MatchCollection rawPairs = orderedPairFinder.Matches(snapshotsRaw[i]);
-                
-                for(int j = 0; j < rawPairs.Count; j++)
+
+                for (int j = 0; j < rawPairs.Count; j++)
                 {
                     Match currentPair = rawPairs[j];
                     float[] parsedPair = {
                         float.Parse(currentPair.Groups["coordx"].Value),
                         float.Parse(currentPair.Groups["coordy"].Value)
                     };
+                    pairs.Add(parsedPair);
                 }
-                
+
                 // Save the snapshot
-                BoidsSnapshot s = new BoidsSnapshot();
+                BoidsSnapshot s = new BoidsSnapshot(t, pairs);
                 Current.Add(s);
             }
         }
