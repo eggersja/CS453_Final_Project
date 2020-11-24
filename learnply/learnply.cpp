@@ -4,6 +4,7 @@
 #include <string.h>
 #include <fstream>
 #include <vector>
+#include <iostream>
 
 #include "glError.h"
 #include "gl/glew.h"
@@ -15,6 +16,11 @@
 #include "polyline.h"
 #include "trackball.h"
 #include "tmatrix.h"
+
+using std::cout;
+using std::cin;
+using std::endl;
+using std::vector;
 
 Polyhedron* poly;
 
