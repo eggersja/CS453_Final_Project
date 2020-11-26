@@ -4,7 +4,7 @@ using System.IO;
 
 namespace boidsTransformer
 {
-    class Program
+    public class Program
     {
         const string DEFAULT_OUTPUT_DIRECTORY = "o";
 
@@ -12,7 +12,7 @@ namespace boidsTransformer
         /// Converts a raw log output from the Boids Simulator (early release) to .ply format.
         /// </summary>
         /// <param name="args">The filename(s) of the files to convert. If preceded by -o flag, the next argument is instead the output directory</param>
-        static void Main(string[] args)
+        public static void Main(string[] args)
         {
             if(args.Length == 0)
             {
