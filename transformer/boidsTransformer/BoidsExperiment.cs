@@ -121,10 +121,10 @@ namespace boidsTransformer
             Current = new List<BoidsSnapshot>();
 
             // Reads the snapshot as a whole.
-            Regex snapshotReader = new Regex(@"(?<time>[\d\.\-]+):(?:(?:[\d\.]+),(?:[\d\.]+);)*",
+            Regex snapshotReader = new Regex(@"(?<time>[\d\.\-]+):(?:(?:-?[\d\.]+),(?:-?[\d\.]+);)*",
                 RegexOptions.Compiled | RegexOptions.IgnoreCase);
             // Reads each ordered pair in the snapshot.
-            Regex orderedPairFinder = new Regex(@"(?<coordx>[\d\.]+),(?<coordy>[\d\.]+);",
+            Regex orderedPairFinder = new Regex(@"(?<coordx>-?[\d\.]+),(?<coordy>-?[\d\.]+);",
                 RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
 
@@ -234,7 +234,7 @@ namespace boidsTransformer
             int offset = -1;
             for (int i = 0; i < faceCount; i++)
             { // For each face
-                if (i % 20 == 0)
+                if (i % (gridSize-1) == 0)
                     offset++; // Don't wrap around corners
                 int comb = i + offset;
                 ply_file.Append("4 "); // Number of verticies.
@@ -351,10 +351,13 @@ namespace boidsTransformer
             targetGridIndicies[1] = new int[] { xLowerIndex, yUpperIndex };
             targetGridIndicies[2] = new int[] { xUpperIndex, yLowerIndex };
             targetGridIndicies[3] = new int[] { xUpperIndex, yUpperIndex };
-            targetVertexBoidSpace[0] = new float[] { (targetGridIndicies[0][0] * cellSize[0]) - bounds[0], (targetGridIndicies[0][1] * cellSize[1]) - bounds[1] };
-            targetVertexBoidSpace[1] = new float[] { (targetGridIndicies[1][0] * cellSize[0]) - bounds[0], (targetGridIndicies[1][1] * cellSize[1]) - bounds[1] };
-            targetVertexBoidSpace[2] = new float[] { (targetGridIndicies[2][0] * cellSize[0]) - bounds[0], (targetGridIndicies[2][1] * cellSize[1]) - bounds[1] };
-            targetVertexBoidSpace[3] = new float[] { (targetGridIndicies[3][0] * cellSize[0]) - bounds[0], (targetGridIndicies[3][1] * cellSize[1]) - bounds[1] };
+            targetVertexBoidSpace[0] = new float[] { (targetGridIndicies[0][0] * cellSize[0]) + bounds[0], (targetGridIndicies[0][1] * cellSize[1]) + bounds[1] };
+            targetVertexBoidSpace[1] = new float[] { (targetGridIndicies[1][0] * cellSize[0]) + bounds[0], (targetGridIndicies[1][1] * cellSize[1]) + bounds[1] };
+            targetVertexBoidSpace[2] = new float[] { (targetGridIndicies[2][0] * cellSize[0]) + bounds[0], (targetGridIndicies[2][1] * cellSize[1]) + bounds[1] };
+            targetVertexBoidSpace[3] = new float[] { (targetGridIndicies[3][0] * cellSize[0]) + bounds[0], (targetGridIndicies[3][1] * cellSize[1]) + bounds[1] };
+            /*Console.WriteLine("Boid ("+boidCoords[0]+","+boidCoords[1]+")" +
+                "Array[" + targetGridIndicies[0][0] + "][" + targetGridIndicies[0][1] + 
+                "] is the vertex at (" + targetVertexBoidSpace[0][0] + ", " + targetVertexBoidSpace[0][1] + ") in space.");*/
 
             // Calculate distance to corners of quad
             float[] distances = new float[4];
@@ -368,7 +371,7 @@ namespace boidsTransformer
             // Apply weights
 
             for (int i = 0; i < 4; i++)
-                trafficGrid[targetGridIndicies[i][0]][targetGridIndicies[i][1]] += weight * (distances[i] / distanceSum);
+                trafficGrid[targetGridIndicies[i][0]][targetGridIndicies[i][1]] += weight - (weight * (distances[i] / distanceSum));
         }
 
         public enum MappingMode
