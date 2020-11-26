@@ -26,7 +26,7 @@ namespace boidTest
         /// </summary>
         public static readonly string TEST_DIRECTORY = "../../../";
 
-        public static readonly string TEST_OUTPUT_DIRECTORY = TEST_DIRECTORY + "o/";
+        public static readonly string TEST_OUTPUT_DIRECTORY = "../../../o/";
 
         /// <remarks>Make sure not to move this by accident.
         /// Tests referencing this should include descriptive error messages describing failures that happen due to this mistake.</remarks>
@@ -135,11 +135,21 @@ namespace boidTest
         [Test]
         public void IntegrationSuccess()
         {
+            // Sanity check
+            FileAssert.Exists(BASIC_TEST_DATA_PATH, "The file " + BASIC_TEST_DATA_PATH + " was moved or is missing.\n" +
+                "This test will not work without a proper test file in this location that has at least one boid.\n" +
+                "(Present execution directory: " + Directory.GetCurrentDirectory() + ")");
+
+            // Setup
             string outFile = TEST_OUTPUT_DIRECTORY + "basic.t1.boids.ply";
             if (File.Exists(outFile))
                 File.Delete(outFile);
-            string[] args = { BASIC_TEST_DATA_PATH, "-o", TEST_OUTPUT_DIRECTORY};
+            string[] args = { BASIC_TEST_DATA_PATH, "-o", TEST_OUTPUT_DIRECTORY.Substring(0, TEST_OUTPUT_DIRECTORY.Length-1) };
+
+            // Execute
             Program.Main(args);
+
+            // Test
             FileAssert.Exists(outFile, "Program failed to create " + outFile);
         }
     }

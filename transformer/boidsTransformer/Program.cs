@@ -7,6 +7,7 @@ namespace boidsTransformer
     public class Program
     {
         const string DEFAULT_OUTPUT_DIRECTORY = "o";
+        public static readonly float[] KNOWN_BOUNDS = { -1000f, -1000f, 1000f, 1000f }; // this isn't supplied in raw data file (sorry)
 
         /// <summary>
         /// Converts a raw log output from the Boids Simulator (early release) to .ply format.
@@ -27,15 +28,26 @@ namespace boidsTransformer
 
             // Get input
             outputDirectory = InterpretArguments(args, inputFiles, outputDirectory);
+
             // Process input
             for(int i = 0; i < inputFiles.Count; i++)
             {
-                Console.WriteLine("Processing Input " + i + "...");
+                experiments.Add(new BoidsExperiment(inputFiles[i], KNOWN_BOUNDS));
             }
-            // Write output
-            for(int i = 0; i < experiments.Count; i++)
+
+            if (inputFiles.Count < experiments.Count)
+                throw new DataMisalignedException("Something messed with the experiment list; expected " + inputFiles.Count + " experiments.");
+
+            // Setup output directory
+            if(!Directory.Exists(outputDirectory))
             {
-                Console.WriteLine("Outputting...");
+                Directory.CreateDirectory(outputDirectory);
+            }
+
+            // Write output
+            for (int i = 0; i < experiments.Count; i++)
+            {
+                File.WriteAllText(outputDirectory + "/" + Path.GetFileName(inputFiles[i]) + ".ply", experiments[i].TrafficPly());
             }
         }
 

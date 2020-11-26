@@ -231,13 +231,17 @@ namespace boidsTransformer
                 }
             }
 
+            int offset = -1;
             for (int i = 0; i < faceCount; i++)
             { // For each face
+                if (i % 20 == 0)
+                    offset++; // Don't wrap around corners
+                int comb = i + offset;
                 ply_file.Append("4 "); // Number of verticies.
-                ply_file.Append(i + " "); // SE corner (xHigh, yHigh)
-                ply_file.Append((i + 1) + " "); // SW corner (xLow, yHigh)
-                ply_file.Append((i + gridSize + 1) + " "); // NW corner (xLow, yLow)
-                ply_file.Append((i + gridSize) + "\n"); // NE corner (xHigh, yLow)
+                ply_file.Append(comb + " "); // SE corner (xHigh, yHigh)
+                ply_file.Append((comb + 1) + " "); // SW corner (xLow, yHigh)
+                ply_file.Append((comb + gridSize + 1) + " "); // NW corner (xLow, yLow)
+                ply_file.Append((comb + gridSize) + "\n"); // NE corner (xHigh, yLow)
             }
 
             // Done!
