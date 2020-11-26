@@ -93,7 +93,7 @@ namespace boidTest
 
             // Execute
             BoidsExperiment easy = new BoidsExperiment(easyDummy);
-            string ply = easy.TrafficPly(); // Don't accidentally ToString your BoidsExperiments; you will NOT get a ply file.
+            string ply = easy.BoidPly(); // Don't accidentally ToString your BoidsExperiments; you will NOT get a ply file.
 
             // Check
             Assert.IsNotNull(ply);

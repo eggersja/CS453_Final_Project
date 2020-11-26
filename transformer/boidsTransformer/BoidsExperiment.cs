@@ -243,10 +243,12 @@ namespace boidsTransformer
         /// </summary>
         /// <param name="gridSize">The size of the .ply grid.</param>
         /// <returns>Traffic ply file</returns>
-        public string TrafficPly(int gridSize = 21)
+        public string BoidPly(int gridSize = 21)
         {
             // Get the trafic density
-            float[][] gridWeights = ProjectTrafficGrid(gridSize);
+            Tuple<float[][], float[][][]> gridWeights = ProjectBoidsToGrid(gridSize);
+            float[][] traffic = gridWeights.Item1;
+            float[][][] paths = gridWeights.Item2;
             int faceCount = (gridSize - 1) * (gridSize - 1);
 
             // Format as .ply
@@ -259,10 +261,10 @@ namespace boidsTransformer
                     ply_file.Append("\t");
                     ply_file.Append(((float)i) - ((float)gridSize - 1) / 2); //y
                     ply_file.Append("\t0.000000"); //z
-                    ply_file.Append("\t0.000000"); //vx
-                    ply_file.Append("\t0.000000"); //vy
-                    ply_file.Append("\t0.000000"); //vz
-                    ply_file.Append("\t" + gridWeights[i][j] + "\n"); //s
+                    ply_file.Append("\t" + paths[i][j][0]); //vx
+                    ply_file.Append("\t" + paths[i][j][1]); //vy
+                    ply_file.Append("\t" + paths[i][j][2]); //vz
+                    ply_file.Append("\t" + traffic[i][j] + "\n"); //s
                 }
             }
 
@@ -325,61 +327,84 @@ namespace boidsTransformer
         /// <remarks>
         /// Weighted at 1 unit of weight per second.
         /// </remarks>
-        protected float[][] ProjectTrafficGrid(int gridSize = 21, float maxTime = float.PositiveInfinity, MappingMode mode = MappingMode.SAME_QUAD)
+        protected Tuple<float[][], float[][][]> ProjectBoidsToGrid(int gridSize = 21, float maxTime = float.PositiveInfinity, MappingMode mode = MappingMode.SAME_QUAD)
         {
             // Initialization
-            float[][] gridWeights = new float[gridSize][];
+            float[][] trafficGrid = new float[gridSize][];
+            float[][][] pathGrid = new float[gridSize][][];
             for (int row = 0; row < gridSize; row++)
             {
-                gridWeights[row] = new float[gridSize];
+                trafficGrid[row] = new float[gridSize];
+                pathGrid[row] = new float[gridSize][];
                 for (int col = 0; col < gridSize; col++)
                 {
-                    gridWeights[row][col] = 0;
+                    trafficGrid[row][col] = 0;
+                    float[] zeroVector = { 0, 0, 0 };
+                    pathGrid[row][col] = zeroVector;
                 }
             }
 
             if (mode == MappingMode.SAME_QUAD)
             {
                 // Add weights
-                for (int i = 0; i < Current.Count; i++)
+                for (int i = 0; i < Current.Count - 1; i++)
                 {
                     BoidsSnapshot snapshot = Current[i];
                     if (snapshot.Timestamp < maxTime) // Since the list is not garunteed to be sorted, we can't break when we pass the max time.
                     {
-                        foreach (float[] coord in snapshot.Coords)
+                        for (int j = 0; j < snapshot.Coords.Count; j++)
                         {
-                            DistributeBoidWeightOverQuad(ref gridWeights, coord, DeltaTime[i]);
+                            float[] coord = snapshot.Coords[j];
+                            float[] direction = 
+                            {
+                                Current[i+1].Coords[j][0] - snapshot.Coords[j][0], // x
+                                Current[i+1].Coords[j][1] - snapshot.Coords[j][1], // y
+                                0 // z
+                            };
+                            DistributeBoidWeightOverQuad(ref trafficGrid, ref pathGrid, coord, direction, DeltaTime[i]);
                         }
                     }
+                }
+                // Special case for last snapshot; no next vector direction, so vector must be either considered zero or set to the last vector for that boid.
+                BoidsSnapshot lastSnapshot = Current[Current.Count - 1];
+                for (int j = 0; j < lastSnapshot.Coords.Count; j++)
+                {
+                    float[] coord = lastSnapshot.Coords[j];
+                    float[] direction = {0, 0, 0};
+                    DistributeBoidWeightOverQuad(ref trafficGrid, ref pathGrid, coord, direction, DeltaTime[Current.Count-1]);
                 }
             }
             else if (mode == MappingMode.ALL_QUAD)
                 throw new System.NotImplementedException("Mapping mode not supported: All quads.");
 
-            return gridWeights;
+            return new Tuple<float[][], float[][][]>(trafficGrid,pathGrid);
         }
 
         /// <summary>
         /// Increases weights within the traffic grid based on a boid's position therein.
         /// </summary>
         /// <param name="trafficGrid">The grid to increase the traffic upon.</param>
+        /// <param name="pathGrid">The grid to increase the pathing on. Row = x, col = y</param>
         /// <param name="boidCoords">The coordinates of the boid to distribute the weight over. (x,y)</param>
         /// <param name="weight">The amount to increase traffic by, in total.</param>
-        protected void DistributeBoidWeightOverQuad(ref float[][] trafficGrid, float[] boidCoords, float weight = 1) =>
-            DistributeBoidWeightOverQuad(ref trafficGrid, boidCoords, Bounds, weight);
+        protected void DistributeBoidWeightOverQuad(ref float[][] trafficGrid, ref float[][][] pathGrid, float[] boidCoords, float[] boidVector, float weight = 1) =>
+            DistributeBoidWeightOverQuad(ref trafficGrid, ref pathGrid, boidCoords, boidVector, Bounds, weight);
 
         /// <summary>
         /// Increases weights within the traffic grid based on a boid's position therein.
         /// </summary>
         /// <param name="trafficGrid">The grid to increase the traffic upon. Row = x, col = y</param>
+        /// <param name="pathGrid">The grid to increase the pathing on. Row = x, col = y</param>
         /// <param name="boidCoords">The coordinates of the boid to distribute the weight over. (x,y)</param>
+        /// <param name="boidVector">The direction the boid is traveling in. Should already be adjusted for time. (x,y,z)</param>
         /// <param name="bounds">The boundaries of the grid. minX, minY, maxX, maxY. Parameter should eventually be replaced.</param>
-        /// <param name="weight">The amount to increase traffic by, in total.</param>
+        /// <param name="trafficWeight">The amount to increase traffic by, in total.</param>
         /// <remarks>
         /// Many of the calculations in this function should be performed fewer times than this funciton is called. This needs to be fixed. Specifically, it would make more sense to pass 
         /// the cell size into this function, since this will usually remain constant.
         /// </remarks>
-        public static void DistributeBoidWeightOverQuad(ref float[][] trafficGrid, float[] boidCoords, float[] bounds, float weight = 1)
+
+        public static void DistributeBoidWeightOverQuad(ref float[][] trafficGrid, ref float[][][] pathGrid, float[] boidCoords, float[] boidVector, float[] bounds, float trafficWeight = 1)
         {
             int[][] targetGridIndicies = new int[4][]; // nw, sw, ne, se
             float[][] targetVertexBoidSpace = new float[4][];
@@ -410,9 +435,16 @@ namespace boidsTransformer
                 distances[i] = MathF.Sqrt(MathF.Pow(targetVertexBoidSpace[i][0]-boidCoords[0], 2) + MathF.Pow(targetVertexBoidSpace[i][1] - boidCoords[1], 2));
                 distanceSum += distances[i];
             }
-            
+
+            // Add the weighted values to the underlying grids.
             for (int i = 0; i < 4; i++)
-                trafficGrid[targetGridIndicies[i][0]][targetGridIndicies[i][1]] += weight - (weight * (distances[i] / distanceSum));
+            {
+                // Scalar data: Relative traffic at that vertex. Appply time-based weighting.
+                trafficGrid[targetGridIndicies[i][0]][targetGridIndicies[i][1]] += trafficWeight - (trafficWeight * (distances[i] / distanceSum));
+                // Vector data: Path at that vertex. Do not apply time-based weighting; vectors should already account for this.
+                for (int j = 0; j < 3; j++)
+                    pathGrid[targetGridIndicies[i][0]][targetGridIndicies[i][1]][j] += boidVector[j] - (boidVector[j] * (distances[i] / distanceSum));
+            }
         }
 
         public enum MappingMode
