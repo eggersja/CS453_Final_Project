@@ -373,6 +373,11 @@ namespace boidsTransformer
                     float[] direction = {0, 0, 0};
                     DistributeBoidWeightOverQuad(ref trafficGrid, ref pathGrid, coord, direction, DeltaTime[Current.Count-1]);
                 }
+                // Divide vector sum by number of vectors to turn the field from a vector sum to a vector average.
+                for (int row = 0; row < pathGrid.Length; row++)
+                    for (int col = 0; col < pathGrid[row].Length; col++)
+                        for (int comp = 0; comp < pathGrid[row][col].Length; comp++)
+                            pathGrid[row][col][comp] /= Current.Count - 1;
             }
             else if (mode == MappingMode.ALL_QUAD)
                 throw new System.NotImplementedException("Mapping mode not supported: All quads.");
