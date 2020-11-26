@@ -151,6 +151,35 @@ namespace boidTest
 
             // Test
             FileAssert.Exists(outFile, "Program failed to create " + outFile);
+            // Cleanup
+            File.Delete(outFile);
+        }
+
+        /// <summary>
+        /// Runs the <see cref="Program.Main(string[])">main method</see> on the <see cref="TEST_OUTPUT_DIRECTORY">sample data</see>,
+        /// producing output <c>.ply</c> data to <see cref="TEST_OUTPUT_DIRECTORY"/><c>/o/basic.t1.boids.ply</c>. Uses a high resolution.
+        /// </summary>
+        [Test]
+        public void IntegrationSuccessHighRez()
+        {
+            // Sanity check
+            FileAssert.Exists(BASIC_TEST_DATA_PATH, "The file " + BASIC_TEST_DATA_PATH + " was moved or is missing.\n" +
+                "This test will not work without a proper test file in this location that has at least one boid.\n" +
+                "(Present execution directory: " + Directory.GetCurrentDirectory() + ")");
+
+            // Setup
+            string outFile = TEST_OUTPUT_DIRECTORY + "basic.t1.boids.ply";
+            if (File.Exists(outFile))
+                File.Delete(outFile);
+            string[] args = { BASIC_TEST_DATA_PATH, "-o", TEST_OUTPUT_DIRECTORY.Substring(0, TEST_OUTPUT_DIRECTORY.Length - 1), "-s", "49" };
+
+            // Execute
+            Program.Main(args);
+
+            // Test
+            FileAssert.Exists(outFile, "Program failed to create " + outFile);
+            // Cleanup
+            File.Delete(outFile);
         }
     }
 }

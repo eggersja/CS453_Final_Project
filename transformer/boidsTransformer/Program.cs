@@ -8,6 +8,7 @@ namespace boidsTransformer
     {
         const string DEFAULT_OUTPUT_DIRECTORY = "o";
         public static readonly float[] KNOWN_BOUNDS = { -1000f, -1000f, 1000f, 1000f }; // this isn't supplied in raw data file (sorry)
+        public static readonly int DEFAULT_GRID_SIZE = 21;
 
         /// <summary>
         /// Converts a raw log output from the Boids Simulator (early release) to .ply format.
@@ -25,9 +26,10 @@ namespace boidsTransformer
             List<string> inputFiles = new List<string>();
             List<BoidsExperiment> experiments = new List<BoidsExperiment>();
             string outputDirectory = DEFAULT_OUTPUT_DIRECTORY;
+            int gridSize = DEFAULT_GRID_SIZE;
 
             // Get input
-            outputDirectory = InterpretArguments(args, inputFiles, outputDirectory);
+            InterpretArguments(args, inputFiles, ref outputDirectory, ref gridSize);
 
             // Process input
             for(int i = 0; i < inputFiles.Count; i++)
@@ -47,16 +49,16 @@ namespace boidsTransformer
             // Write output
             for (int i = 0; i < experiments.Count; i++)
             {
-                File.WriteAllText(outputDirectory + "/" + Path.GetFileName(inputFiles[i]) + ".ply", experiments[i].TrafficPly());
+                File.WriteAllText(outputDirectory + "/" + Path.GetFileName(inputFiles[i]) + ".ply", experiments[i].TrafficPly(gridSize));
             }
         }
 
-        protected static string InterpretArguments(string[] args, List<string> inputFiles, string outputDirectory)
+        protected static void InterpretArguments(string[] args, List<string> inputFiles, ref string outputDirectory, ref int gridRes)
         {
             for (int i = 0; i < args.Length; i++)
             {
                 if (args[i] == "-o")
-                { // Handle flags
+                { // Handle output flag
                     if (i == args.Length - 1)
                     {
                         Console.WriteLine("Argument \"-o\" supplied with no following output directory.\n"
@@ -67,6 +69,28 @@ namespace boidsTransformer
                         // args[i+1] is the intended output directory.
                         outputDirectory = args[i + 1];
                         i++; // Skip interpretation of next argument
+                    }
+                }
+                else if (args[i] == "-s")
+                { // Handle resolution flag
+                    if (i == args.Length - 1)
+                    {
+                        Console.WriteLine("Argument \"-s\" supplied with no following resolution.\n"
+                            + "Assuming default: " + gridRes);
+                    }
+                    else
+                    {
+                        int newRes;
+                        if (!int.TryParse(args[i + 1], out newRes))
+                            Console.WriteLine(args[i + 1] + " is not an integer!");
+                        else
+                        {
+                            if (newRes <= 0)
+                                Console.WriteLine(args[i + 1] + " must be positive!");
+                            else
+                                gridRes = newRes;
+                        }
+                        i++;
                     }
                 }
                 else
@@ -81,7 +105,6 @@ namespace boidsTransformer
                 }
             }
 
-            return outputDirectory;
         }
     }
 }
