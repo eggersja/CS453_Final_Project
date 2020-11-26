@@ -339,13 +339,10 @@ namespace boidsTransformer
             float[] cellSize = { gridSize[0] / (trafficGrid.Length - 1), gridSize[1] / (trafficGrid[0].Length - 1)}; // Width(rows), height(cols)
 
             // Calculate the boid's quad. Lots of this could be easily put into a loop.
-            Console.WriteLine("CellX: " + cellSize[0] + " CellY: " + cellSize[1]);
-            Console.WriteLine("MinX: " + bounds[0] + " MinY: " + bounds[1] + " MaxX: " + bounds[2] + " MaxY: " + bounds[3]);
             int xLowerIndex = (int)MathF.Floor((boidCoords[0] - bounds[0]) / cellSize[0]);
             int yLowerIndex = (int)MathF.Floor((boidCoords[1] - bounds[1]) / cellSize[1]);
             int xUpperIndex = (int)MathF.Ceiling((boidCoords[0] - bounds[0]) / cellSize[0]);
             int yUpperIndex = (int)MathF.Ceiling((boidCoords[1] - bounds[1]) / cellSize[1]);
-            Console.WriteLine("LowerX: " + xLowerIndex + " LowerY: " + yLowerIndex + " UpperX: " + xUpperIndex + " UpperY: " + yUpperIndex);
             targetGridIndicies[0] = new int[] { xLowerIndex, yLowerIndex };
             targetGridIndicies[1] = new int[] { xLowerIndex, yUpperIndex };
             targetGridIndicies[2] = new int[] { xUpperIndex, yLowerIndex };
@@ -367,12 +364,7 @@ namespace boidsTransformer
             // Apply weights
 
             for (int i = 0; i < 4; i++)
-            {
-                Console.WriteLine("Can I write to grid [" + targetGridIndicies[i][0] + "][" + targetGridIndicies[i][1] + "]?");
-                if (targetGridIndicies[i][0] >= trafficGrid.Length || targetGridIndicies[i][1] >= trafficGrid[targetGridIndicies[i][0]].Length)
-                Console.WriteLine("Cannot write to grid ["+ targetGridIndicies[i][0] + "]["+ targetGridIndicies[i][1] + "]");
                 trafficGrid[targetGridIndicies[i][0]][targetGridIndicies[i][1]] += weight * (distances[i] / distanceSum);
-            }
         }
 
         public enum MappingMode
