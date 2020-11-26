@@ -1,6 +1,9 @@
 using NUnit.Framework;
 using boidsTransformer;
 using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
+using System;
 
 namespace boidTest
 {
@@ -67,7 +70,7 @@ namespace boidTest
         public void LoadRealFile()
         {
             // Sanity check
-            FileAssert.Exists(BASIC_TEST_DATA_PATH, "The file " + BASIC_TEST_DATA_PATH + " was moved or is missing.\n" + 
+            FileAssert.Exists(BASIC_TEST_DATA_PATH, "The file " + BASIC_TEST_DATA_PATH + " was moved or is missing.\n" +
                 "This test will not work without a proper test file in this location that has at least one boid.\n" +
                 "(Present execution directory: " + Directory.GetCurrentDirectory() + ")");
 
@@ -77,6 +80,52 @@ namespace boidTest
             // Test
             Assert.IsTrue(realExperiment.Current.Count > 0, "The file " + BASIC_TEST_DATA_PATH + "did not contain any parseable data.");
             Assert.IsTrue(realExperiment.BoidCount > 0, "The file " + BASIC_TEST_DATA_PATH + "did not result in a boid being instantiated.");
+        }
+
+        /// <summary>
+        /// Verifies the ability of a <see cref="BoidsExperiment"/> to format itself as a <c>.ply</c> file. Depends on <see cref="SingleSnapshot"/>.
+        /// </summary>
+        [Test]
+        public void PlyGeneration()
+        {
+            // Initialize
+            string[] easyDummy = { SYNTHETIC_EASY };
+
+            // Execute
+            BoidsExperiment easy = new BoidsExperiment(easyDummy);
+            string ply = easy.TrafficPly(); // Don't accidentally ToString your BoidsExperiments; you will NOT get a ply file.
+
+            // Check
+            Assert.IsNotNull(ply);
+
+            // Prepare the correct header.
+            StringBuilder correctPlyHeader = new StringBuilder();
+            correctPlyHeader.Append("ply\n");
+            correctPlyHeader.Append("format ascii 1.0\n");
+            correctPlyHeader.Append("comment created by boidsTransformer\n");
+            correctPlyHeader.Append("element vertex " + 441 + "\n");
+            correctPlyHeader.Append("property float64 x\n");
+            correctPlyHeader.Append("property float64 y\n");
+            correctPlyHeader.Append("property float64 z\n");
+            correctPlyHeader.Append("property float64 vx\n");
+            correctPlyHeader.Append("property float64 vy\n");
+            correctPlyHeader.Append("property float64 vz\n");
+            correctPlyHeader.Append("property float64 s\n");
+            correctPlyHeader.Append("element face " + 400 + "\n");
+            correctPlyHeader.Append("property list uint8 int32 vertex_indices\n");
+            correctPlyHeader.Append("end_header\n");
+
+            string correct_ply_str = correctPlyHeader.ToString();
+
+            Assert.IsTrue(ply.Length > 0);
+            Assert.IsTrue(ply.Length > correctPlyHeader.Length);
+            Assert.IsTrue(correctPlyHeader.Equals(ply.Substring(0, correct_ply_str.Length)),
+                "Expected: \"" + correct_ply_str + "\", but got \"" + ply.Substring(0, correct_ply_str.Length) + "\".");
+            // REGEX check the body.
+            Regex bodyCheck = new Regex(@"(?:(?:-?[\d\.]+\s+){7})+(?:(?:[\d]+\s+){5})+",
+                RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+            Assert.IsTrue(bodyCheck.IsMatch(ply));
         }
 
         /// <summary>
