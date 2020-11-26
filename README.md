@@ -8,6 +8,14 @@ Final project for CS453.
 ```
 Where each ordered pair is the coordinate of the boid at that moment in time.
 
+## Using the data transformer
+
+Build the data transformer for release and then run with the syntax:
+`./transformer/boidsTransformer/bin/Release/net5.0/boidsTransformer.exe [Input files] -o [Output directory] -s [Resolution]`
+For example:
+`./transformer/boidsTransformer/bin/Release/net5.0/boidsTransformer.exe datasets/raw_boids_base/basic.t1.boids datasets/raw_boids_base/basic.t2.boids datasets/raw_boids_base/basic.t3.boids datasets/raw_boids_base/basic.t4.boids datasets/raw_boids_base/basic.t5.boids datasets/raw_boids_base/basic.t6.boids datasets/raw_boids_base/basic.t7.boids datasets/raw_boids_base/basic.t8.boids datasets/raw_boids_base/basic.t9.boids datasets/raw_boids_base/basic.t10.boids datasets/raw_boids_base/basic.t11.boids -o datasets/proc_boids_basic -s 49`
+(The execution of the above command took about 5 seconds on a developer PC).
+
 # Execution Parameters
 
 basic (`datasets/raw_boids_base`):
