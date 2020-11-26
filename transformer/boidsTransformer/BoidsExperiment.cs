@@ -43,6 +43,41 @@ namespace boidsTransformer
         /// </summary>
         public List<BoidsSnapshot> Current { get; protected set; }
 
+        private List<float> deltaTime;
+
+        public List<float> DeltaTime { 
+            get
+            {
+                if (deltaTime == null || deltaTime.Count != Current.Count)
+                    PopulateDeltaTime();
+                return deltaTime;
+            }
+        }
+
+        /// <summary>
+        /// Fills the list <see cref="deltaTime"/> with the differences in times between the snapshots in <see cref="Current"/>
+        /// </summary>
+        /// <returns>True if the deltaTimes are all positive (i.e. <see cref="Current"/> is sorted)</returns>
+        private bool PopulateDeltaTime()
+        {
+            bool ok = true;
+            deltaTime = new List<float>();
+            float avg = 0;
+            for (int i = 0; i < Current.Count - 1; i++)
+            {
+                float dt = Current[i + 1].Timestamp - Current[i].Timestamp;
+                if (dt < 0)
+                {
+                    Console.Error.WriteLine("Warning: BoidsExperiment.Current is not sorted. Is there an error in the source data file?");
+                    ok = false;
+                }
+                deltaTime.Add(dt);
+                avg += dt;
+            }
+            deltaTime.Add(avg / (Current.Count - 1));
+            return ok;
+        }
+
         /// <summary>
         /// The number of boids in the experiment.
         /// </summary>
@@ -248,7 +283,13 @@ namespace boidsTransformer
             return ply_file.ToString();
         }
 
-
+        /// <summary>
+        /// Generates a <c>.ply</c> file header to associate with a <paramref name="gridSize"/>x<paramref name="gridSize"/> grid of values.<para/>
+        /// Data to be stored in the <c>.ply</c> file is vector and scalar data for each vertex, and faces connecting the verticies on the grid.
+        /// </summary>
+        /// <param name="gridSize">The length and width of the grid.</param>
+        /// <returns>A header for the <c>.ply</c> file format (newline terminated).</returns>
+        /// <remarks>Could be augmented so the grid does not have to be square, but would also require work in whatever other functions are involved in generating the <c>ply</c> file.</remarks>
         public static StringBuilder GeneratePlyHeader(int gridSize)
         {
             if (gridSize < 0)
@@ -281,6 +322,9 @@ namespace boidsTransformer
         /// <param name="maxTime">The amount of seconds within the simulation to include when making the grid (up until the end of the simluation)</param>
         /// <param name="mode">The type of mapping to perform between vertices on the grid and the bots</param>
         /// <returns>Traffic grid</returns>
+        /// <remarks>
+        /// Weighted at 1 unit of weight per second.
+        /// </remarks>
         protected float[][] ProjectTrafficGrid(int gridSize = 21, float maxTime = float.PositiveInfinity, MappingMode mode = MappingMode.SAME_QUAD)
         {
             // Initialization
@@ -297,13 +341,14 @@ namespace boidsTransformer
             if (mode == MappingMode.SAME_QUAD)
             {
                 // Add weights
-                foreach (BoidsSnapshot snapshot in Current)
+                for (int i = 0; i < Current.Count; i++)
                 {
+                    BoidsSnapshot snapshot = Current[i];
                     if (snapshot.Timestamp < maxTime) // Since the list is not garunteed to be sorted, we can't break when we pass the max time.
                     {
                         foreach (float[] coord in snapshot.Coords)
                         {
-                            DistributeBoidWeightOverQuad(ref gridWeights, coord, 1);
+                            DistributeBoidWeightOverQuad(ref gridWeights, coord, DeltaTime[i]);
                         }
                     }
                 }
@@ -355,11 +400,8 @@ namespace boidsTransformer
             targetVertexBoidSpace[1] = new float[] { (targetGridIndicies[1][0] * cellSize[0]) + bounds[0], (targetGridIndicies[1][1] * cellSize[1]) + bounds[1] };
             targetVertexBoidSpace[2] = new float[] { (targetGridIndicies[2][0] * cellSize[0]) + bounds[0], (targetGridIndicies[2][1] * cellSize[1]) + bounds[1] };
             targetVertexBoidSpace[3] = new float[] { (targetGridIndicies[3][0] * cellSize[0]) + bounds[0], (targetGridIndicies[3][1] * cellSize[1]) + bounds[1] };
-            /*Console.WriteLine("Boid ("+boidCoords[0]+","+boidCoords[1]+")" +
-                "Array[" + targetGridIndicies[0][0] + "][" + targetGridIndicies[0][1] + 
-                "] is the vertex at (" + targetVertexBoidSpace[0][0] + ", " + targetVertexBoidSpace[0][1] + ") in space.");*/
 
-            // Calculate distance to corners of quad
+            // Calculate distance to corners of quad.
             float[] distances = new float[4];
             float distanceSum = 0;
             for (int i = 0; i < 4; i++) 
@@ -368,8 +410,7 @@ namespace boidsTransformer
                 distances[i] = MathF.Sqrt(MathF.Pow(targetVertexBoidSpace[i][0]-boidCoords[0], 2) + MathF.Pow(targetVertexBoidSpace[i][1] - boidCoords[1], 2));
                 distanceSum += distances[i];
             }
-            // Apply weights
-
+            
             for (int i = 0; i < 4; i++)
                 trafficGrid[targetGridIndicies[i][0]][targetGridIndicies[i][1]] += weight - (weight * (distances[i] / distanceSum));
         }
