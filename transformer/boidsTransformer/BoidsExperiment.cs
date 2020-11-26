@@ -332,15 +332,18 @@ namespace boidsTransformer
             // Initialization
             float[][] trafficGrid = new float[gridSize][];
             float[][][] pathGrid = new float[gridSize][][];
+            float[][] weightGrid = new float[gridSize][];
             for (int row = 0; row < gridSize; row++)
             {
                 trafficGrid[row] = new float[gridSize];
                 pathGrid[row] = new float[gridSize][];
+                weightGrid[row] = new float[gridSize];
                 for (int col = 0; col < gridSize; col++)
                 {
                     trafficGrid[row][col] = 0;
                     float[] zeroVector = { 0, 0, 0 };
                     pathGrid[row][col] = zeroVector;
+                    weightGrid[row][col] = 0;
                 }
             }
 
@@ -361,7 +364,7 @@ namespace boidsTransformer
                                 Current[i+1].Coords[j][1] - snapshot.Coords[j][1], // y
                                 0 // z
                             };
-                            DistributeBoidWeightOverQuad(ref trafficGrid, ref pathGrid, coord, direction, DeltaTime[i]);
+                            DistributeBoidWeightOverQuad(ref trafficGrid, ref pathGrid, coord, direction, ref weightGrid, DeltaTime[i]);
                         }
                     }
                 }
@@ -371,13 +374,8 @@ namespace boidsTransformer
                 {
                     float[] coord = lastSnapshot.Coords[j];
                     float[] direction = {0, 0, 0};
-                    DistributeBoidWeightOverQuad(ref trafficGrid, ref pathGrid, coord, direction, DeltaTime[Current.Count-1]);
+                    DistributeBoidWeightOverQuad(ref trafficGrid, ref pathGrid, coord, direction, ref weightGrid, DeltaTime[Current.Count-1]);
                 }
-                // Divide vector sum by number of vectors to turn the field from a vector sum to a vector average.
-                for (int row = 0; row < pathGrid.Length; row++)
-                    for (int col = 0; col < pathGrid[row].Length; col++)
-                        for (int comp = 0; comp < pathGrid[row][col].Length; comp++)
-                            pathGrid[row][col][comp] /= Current.Count - 1;
             }
             else if (mode == MappingMode.ALL_QUAD)
                 throw new System.NotImplementedException("Mapping mode not supported: All quads.");
@@ -391,9 +389,10 @@ namespace boidsTransformer
         /// <param name="trafficGrid">The grid to increase the traffic upon.</param>
         /// <param name="pathGrid">The grid to increase the pathing on. Row = x, col = y</param>
         /// <param name="boidCoords">The coordinates of the boid to distribute the weight over. (x,y)</param>
+        /// <param name="weightGrid">The number of vectors applied to each vertex. Used for adding new vectors as parts of the total being averaged. Does not need to be an int.</param>
         /// <param name="weight">The amount to increase traffic by, in total.</param>
-        protected void DistributeBoidWeightOverQuad(ref float[][] trafficGrid, ref float[][][] pathGrid, float[] boidCoords, float[] boidVector, float weight = 1) =>
-            DistributeBoidWeightOverQuad(ref trafficGrid, ref pathGrid, boidCoords, boidVector, Bounds, weight);
+        protected void DistributeBoidWeightOverQuad(ref float[][] trafficGrid, ref float[][][] pathGrid, float[] boidCoords, float[] boidVector, ref float[][] weightGrid, float weight = 1) =>
+            DistributeBoidWeightOverQuad(ref trafficGrid, ref pathGrid, boidCoords, boidVector, Bounds, ref weightGrid, weight);
 
         /// <summary>
         /// Increases weights within the traffic grid based on a boid's position therein.
@@ -403,13 +402,14 @@ namespace boidsTransformer
         /// <param name="boidCoords">The coordinates of the boid to distribute the weight over. (x,y)</param>
         /// <param name="boidVector">The direction the boid is traveling in. Should already be adjusted for time. (x,y,z)</param>
         /// <param name="bounds">The boundaries of the grid. minX, minY, maxX, maxY. Parameter should eventually be replaced.</param>
+        /// <param name="weightGrid">The number of vectors applied to each vertex. Used for adding new vectors as parts of the total being averaged. Does not need to be an int.</param>
         /// <param name="trafficWeight">The amount to increase traffic by, in total.</param>
         /// <remarks>
         /// Many of the calculations in this function should be performed fewer times than this funciton is called. This needs to be fixed. Specifically, it would make more sense to pass 
         /// the cell size into this function, since this will usually remain constant.
         /// </remarks>
 
-        public static void DistributeBoidWeightOverQuad(ref float[][] trafficGrid, ref float[][][] pathGrid, float[] boidCoords, float[] boidVector, float[] bounds, float trafficWeight = 1)
+        public static void DistributeBoidWeightOverQuad(ref float[][] trafficGrid, ref float[][][] pathGrid, float[] boidCoords, float[] boidVector, float[] bounds, ref float[][] weightGrid, float trafficWeight = 1)
         {
             int[][] targetGridIndicies = new int[4][]; // nw, sw, ne, se
             float[][] targetVertexBoidSpace = new float[4][];
@@ -448,7 +448,16 @@ namespace boidsTransformer
                 trafficGrid[targetGridIndicies[i][0]][targetGridIndicies[i][1]] += trafficWeight - (trafficWeight * (distances[i] / distanceSum));
                 // Vector data: Path at that vertex. Do not apply time-based weighting; vectors should already account for this.
                 for (int j = 0; j < 3; j++)
-                    pathGrid[targetGridIndicies[i][0]][targetGridIndicies[i][1]][j] += boidVector[j] - (boidVector[j] * (distances[i] / distanceSum));
+                {
+                    float portion = 1 - (distances[i] / distanceSum); // Portion of the new component to add.
+                    float newComp = boidVector[j]*portion; // New component to be added to this specific vertex
+                    float prevWeight = weightGrid[targetGridIndicies[i][0]][targetGridIndicies[i][1]]; // Amount of vectors that have been added so far.
+                    float newWeight = prevWeight + portion;
+                    pathGrid[targetGridIndicies[i][0]][targetGridIndicies[i][1]][j] *= prevWeight;
+                    pathGrid[targetGridIndicies[i][0]][targetGridIndicies[i][1]][j] += newComp;
+                    pathGrid[targetGridIndicies[i][0]][targetGridIndicies[i][1]][j] /= newWeight;
+                    weightGrid[targetGridIndicies[i][0]][targetGridIndicies[i][1]] = newWeight;
+                }
             }
         }
 
