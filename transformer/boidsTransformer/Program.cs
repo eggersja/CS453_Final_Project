@@ -49,7 +49,7 @@ namespace boidsTransformer
             // Write output
             for (int i = 0; i < experiments.Count; i++)
             {
-                File.WriteAllText(outputDirectory + "/" + Path.GetFileName(inputFiles[i]) + ".ply", experiments[i].TrafficPly(gridSize));
+                File.WriteAllText(outputDirectory + "/" + Path.GetFileName(inputFiles[i]) + ".ply", experiments[i].BoidPly(gridSize));
             }
         }
 
