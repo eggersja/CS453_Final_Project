@@ -188,7 +188,8 @@ Main program.
 int main(int argc, char* argv[])
 {
 	/*load mesh from ply file*/
-	FILE* this_file = fopen("../datasets/project_data/test.ply", "r");
+	FILE* this_file = fopen("../datasets/proc_boids_basic/basic.t11.boids.ply", "r");
+	//FILE* this_file = fopen("../datasets/scalar_data/saddle_test.ply", "r");
 
 	poly = new Polyhedron(this_file);
 	fclose(this_file);
@@ -986,6 +987,37 @@ void keyboard(unsigned char key, int x, int y) {
 		//show the IBFV of the field
 		break;
 
+	// heatmap
+	case '6': {
+		display_mode = 6;
+
+		double min = poly->vlist[0]->scalar;
+		double max = poly->vlist[0]->scalar;
+
+		// Find min/max
+		for (int i = 0; i < poly->nverts; i++) {
+			Vertex* temp_v = poly->vlist[i];
+			double scalar = temp_v->scalar;
+
+			if (scalar < min) min = scalar;
+			if (scalar > max) max = scalar;
+		}
+
+		// Color Quads
+		for (int i = 0; i < poly->nverts; i++) {
+			Vertex* temp_v = poly->vlist[i];
+			double scalar = temp_v->scalar;
+
+			temp_v->R = (scalar - min) / (max - min);
+			temp_v->G = 0.0;
+			temp_v->B = (max - scalar) / (max - min);
+			temp_v->z = 0.0;
+		}
+
+		glutPostRedisplay();
+	}
+	break;
+
 	case 'r':
 		mat_ident(rotmat);
 		translation[0] = 0;
@@ -1014,112 +1046,127 @@ void display_polyhedron(Polyhedron* poly)
 	CHECK_GL_ERROR();
 
 	switch (display_mode) {
-	case 1:
-	{
-		glEnable(GL_LIGHTING);
-		glEnable(GL_LIGHT0);
-		glEnable(GL_LIGHT1);
+		case 1:
+		{
+			glEnable(GL_LIGHTING);
+			glEnable(GL_LIGHT0);
+			glEnable(GL_LIGHT1);
 
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		GLfloat mat_diffuse[4] = { 1.0, 1.0, 0.0, 0.0 };
-		GLfloat mat_specular[] = { 1.0, 1.0, 1.0, 1.0 };
-		glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
-		glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
-		glMaterialf(GL_FRONT, GL_SHININESS, 50.0);
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			GLfloat mat_diffuse[4] = { 1.0, 1.0, 0.0, 0.0 };
+			GLfloat mat_specular[] = { 1.0, 1.0, 1.0, 1.0 };
+			glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
+			glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
+			glMaterialf(GL_FRONT, GL_SHININESS, 50.0);
 
-		for (int i = 0; i < poly->nquads; i++) {
-			Quad* temp_q = poly->qlist[i];
-			glBegin(GL_POLYGON);
-			for (int j = 0; j < 4; j++) {
-				Vertex* temp_v = temp_q->verts[j];
-				glNormal3d(temp_v->normal.entry[0], temp_v->normal.entry[1], temp_v->normal.entry[2]);
-				glVertex3d(temp_v->x, temp_v->y, temp_v->z);
+			for (int i = 0; i < poly->nquads; i++) {
+				Quad* temp_q = poly->qlist[i];
+				glBegin(GL_POLYGON);
+				for (int j = 0; j < 4; j++) {
+					Vertex* temp_v = temp_q->verts[j];
+					glNormal3d(temp_v->normal.entry[0], temp_v->normal.entry[1], temp_v->normal.entry[2]);
+					glVertex3d(temp_v->x, temp_v->y, temp_v->z);
+				}
+				glEnd();
 			}
-			glEnd();
-		}
 
-		CHECK_GL_ERROR();
-	}
-	break;
-
-	case 2:
-	{
-		glDisable(GL_LIGHTING);
-		glEnable(GL_LINE_SMOOTH);
-		glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		glLineWidth(1.0);
-		for (int i = 0; i < poly->nquads; i++) {
-			Quad* temp_q = poly->qlist[i];
-
-			glBegin(GL_POLYGON);
-			for (int j = 0; j < 4; j++) {
-				Vertex* temp_v = temp_q->verts[j];
-				glNormal3d(temp_q->normal.entry[0], temp_q->normal.entry[1], temp_q->normal.entry[2]);
-				glColor3f(0.0, 0.0, 0.0);
-				glVertex3d(temp_v->x, temp_v->y, temp_v->z);
-			}
-			glEnd();
-
-		}
-
-		glDisable(GL_BLEND);
-	}
-	break;
-
-	case 3:
-		glDisable(GL_LIGHTING);
-		for (int i = 0; i < poly->nquads; i++) {
-			Quad* temp_q = poly->qlist[i];
-			glBegin(GL_POLYGON);
-			for (int j = 0; j < 4; j++) {
-				Vertex* temp_v = temp_q->verts[j];
-				glColor3f(temp_v->R, temp_v->G, temp_v->B);
-				glVertex3d(temp_v->x, temp_v->y, temp_v->z);
-			}
-			glEnd();
+			CHECK_GL_ERROR();
 		}
 		break;
 
-	case 4:
-	{
-		//draw a dot at position (0.2, 0.3, 0.4) 
-		//with radius 0.1 in color blue(0.0, 0.0, 1.0)
-		drawDot(0.2, 0.3, 0.4, 0.1, 0.0, 0.0, 1.0);
+		case 2:
+		{
+			glDisable(GL_LIGHTING);
+			glEnable(GL_LINE_SMOOTH);
+			glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+			glLineWidth(1.0);
+			for (int i = 0; i < poly->nquads; i++) {
+				Quad* temp_q = poly->qlist[i];
 
-		//draw a dot at position of vlist[110]
-		//with radius 0.2 in color magenta (1.0, 0.0, 1.0)
-		Vertex *v = poly->vlist[110];
-		drawDot(v->x, v->y, v->z, 0.2, 1.0, 0.0, 1.0);
+				glBegin(GL_POLYGON);
+				for (int j = 0; j < 4; j++) {
+					Vertex* temp_v = temp_q->verts[j];
+					glNormal3d(temp_q->normal.entry[0], temp_q->normal.entry[1], temp_q->normal.entry[2]);
+					glColor3f(0.0, 0.0, 0.0);
+					glVertex3d(temp_v->x, temp_v->y, temp_v->z);
+				}
+				glEnd();
 
-		//draw line segment start at vlist[110] and end at (vlist[135]->x, vlist[135]->y, 4)
-		//with color (0.02, 0.1, 0.02) and width 1
-		LineSegment line(poly->vlist[110]->x, poly->vlist[110]->y, poly->vlist[110]->z,
-			poly->vlist[135]->x, poly->vlist[135]->y, 4);
-		drawLineSegment(line, 1.0, 0.0, 1.0, 0.0);
-
-		//draw a polyline of pentagon with color orange(1.0, 0.5, 0.0) and width 2
-		drawPolyline(pentagon, 2.0, 1.0, 0.5, 0.0);
-
-		//display the mesh with color cyan (0.0, 1.0, 1.0)
-		glDisable(GL_LIGHTING);
-		for (int i = 0; i < poly->nquads; i++) {
-			Quad* temp_q = poly->qlist[i];
-			glBegin(GL_POLYGON);
-			for (int j = 0; j < 4; j++) {
-				Vertex* temp_v = temp_q->verts[j];
-				glColor3f(0.0, 1.0, 1.0);
-				glVertex3d(temp_v->x, temp_v->y, temp_v->z);
 			}
-			glEnd();
-		}
-	}
-	break;
 
-	case 5:
-		displayIBFV();
+			glDisable(GL_BLEND);
+		}
+		break;
+
+		case 3:
+			glDisable(GL_LIGHTING);
+			for (int i = 0; i < poly->nquads; i++) {
+				Quad* temp_q = poly->qlist[i];
+				glBegin(GL_POLYGON);
+				for (int j = 0; j < 4; j++) {
+					Vertex* temp_v = temp_q->verts[j];
+					glColor3f(temp_v->R, temp_v->G, temp_v->B);
+					glVertex3d(temp_v->x, temp_v->y, temp_v->z);
+				}
+				glEnd();
+			}
+			break;
+
+		case 4:
+		{
+			//draw a dot at position (0.2, 0.3, 0.4) 
+			//with radius 0.1 in color blue(0.0, 0.0, 1.0)
+			drawDot(0.2, 0.3, 0.4, 0.1, 0.0, 0.0, 1.0);
+
+			//draw a dot at position of vlist[110]
+			//with radius 0.2 in color magenta (1.0, 0.0, 1.0)
+			Vertex *v = poly->vlist[110];
+			drawDot(v->x, v->y, v->z, 0.2, 1.0, 0.0, 1.0);
+
+			//draw line segment start at vlist[110] and end at (vlist[135]->x, vlist[135]->y, 4)
+			//with color (0.02, 0.1, 0.02) and width 1
+			LineSegment line(poly->vlist[110]->x, poly->vlist[110]->y, poly->vlist[110]->z,
+				poly->vlist[135]->x, poly->vlist[135]->y, 4);
+			drawLineSegment(line, 1.0, 0.0, 1.0, 0.0);
+
+			//draw a polyline of pentagon with color orange(1.0, 0.5, 0.0) and width 2
+			drawPolyline(pentagon, 2.0, 1.0, 0.5, 0.0);
+
+			//display the mesh with color cyan (0.0, 1.0, 1.0)
+			glDisable(GL_LIGHTING);
+			for (int i = 0; i < poly->nquads; i++) {
+				Quad* temp_q = poly->qlist[i];
+				glBegin(GL_POLYGON);
+				for (int j = 0; j < 4; j++) {
+					Vertex* temp_v = temp_q->verts[j];
+					glColor3f(0.0, 1.0, 1.0);
+					glVertex3d(temp_v->x, temp_v->y, temp_v->z);
+				}
+				glEnd();
+			}
+		}
+		break;
+
+		case 5:
+			displayIBFV();
+			break;
+
+		case 6: {
+			glDisable(GL_LIGHTING);
+			for (int i = 0; i < poly->nquads; i++) {
+				Quad* temp_q = poly->qlist[i];
+				glBegin(GL_POLYGON);
+				for (int j = 0; j < 4; j++) {
+					Vertex* temp_v = temp_q->verts[j];
+					glColor3f(temp_v->R, temp_v->G, temp_v->B);
+					glVertex3d(temp_v->x, temp_v->y, temp_v->z);
+				}
+				glEnd();
+			}
+		}
 		break;
 	}
 }
