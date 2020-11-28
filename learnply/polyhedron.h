@@ -73,6 +73,8 @@ public:
 class Polyhedron {
 public:
 
+	int minx, maxx, miny, maxy;
+
 	Quad **qlist;		/* list of quads */
 	int nquads;
 	int max_quads;

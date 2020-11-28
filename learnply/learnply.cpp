@@ -26,6 +26,14 @@ using std::string;
 
 Polyhedron* poly;
 
+/* random globals */
+bool showPickedPoint = false;
+bool showSingularities = false;
+bool showAllStreamlines = false;
+icVector3 pickedPoint;
+PolyLine streamline_picked;
+vector<PolyLine> streamlines;
+
 /*scene related variables*/
 const float zoomspeed = 0.9;
 const int view_mode = 0;		// 0 = othogonal, 1=perspective
@@ -68,6 +76,8 @@ void makePatterns(void);
 
 /* custom functions */
 void updatePolyFile(bool increase);
+void extract_streamline(double, double, double, PolyLine&);
+icVector3 getDir(double, double, double);
 
 /*glut attaching functions*/
 void keyboard(unsigned char key, int x, int y);
@@ -938,6 +948,132 @@ void updatePolyFile(bool increase) {
 }
 
 /******************************************************************************
+Custom function for finding the direction at a specific point
+******************************************************************************/
+
+icVector3 getDir(double x, double y, double z) {
+	Quad* q = NULL;
+	double x1, x2, y1, y2;
+
+	// find quad the point's in
+	for (int i = 0; i < poly->nquads; i++) {
+		q = poly->qlist[i];
+
+		/* find x1, x2, y1, y2
+		   [1] . . . [0]
+			.         .
+			.         .
+			.         .
+		   [2] . . . [3]
+		*/
+		x1 = q->verts[2]->x;
+		y1 = q->verts[2]->y;
+		x2 = q->verts[0]->x;
+		y2 = q->verts[0]->y;
+
+		if (x <= x2 && x >= x1 && y <= y2 && y >= y1)
+			break; // found
+	}
+
+	// find k (usually just 2)
+	int k = -1;
+	for (int i = 0; i < 4; i++) {
+		if (q->verts[i]->x == x1 && q->verts[i]->y == y1)
+			k = i;
+	}
+
+	// find dirX
+	double fx1y1 = q->verts[k]->vx;
+	double fx2y1 = q->verts[(k + 1) % 4]->vx;
+	double fx2y2 = q->verts[(k + 2) % 4]->vx;
+	double fx1y2 = q->verts[(k + 3) % 4]->vx;
+
+	double p1 = ((x2 - x) / (x2 - x1)) * ((y2 - y) / (y2 - y1));
+	double p2 = ((x - x1) / (x2 - x1)) * ((y2 - y) / (y2 - y1));
+	double p3 = ((x2 - x) / (x2 - x1)) * ((y - y1) / (y2 - y1));
+	double p4 = ((x - x1) / (x2 - x1)) * ((y - y1) / (y2 - y1));
+
+	double dirX = (p1 * fx1y1) + (p2 * fx2y1) + (p3 * fx1y2) + (p4 * fx2y2);
+
+	// find dirY
+	fx1y1 = q->verts[k]->vy;
+	fx2y1 = q->verts[(k + 1) % 4]->vy;
+	fx2y2 = q->verts[(k + 2) % 4]->vy;
+	fx1y2 = q->verts[(k + 3) % 4]->vy;
+
+	double dirY = (p1 * fx1y1) + (p2 * fx2y1) + (p3 * fx1y2) + (p4 * fx2y2);
+
+	return icVector3(dirX, dirY, 0);
+}
+
+/******************************************************************************
+Custom function for extracting a files streamline
+******************************************************************************/
+
+void extract_streamline(double x, double y, double z, PolyLine& contour) {
+	double step = .25;
+	int count = 1500;
+	double c_x = x;
+	double c_y = y;
+	double c_z = z;
+
+	// trace forward
+	for (int i = 0; i < count; i++) {
+		// part 1
+		if (c_x > poly->maxx || c_x < poly->minx || c_y > poly->maxy || c_y < poly->miny)
+			continue;
+
+		// part 2
+		icVector3 start = icVector3(c_x, c_y, c_z);
+		icVector3 dir = getDir(c_x, c_y, c_z);
+		normalize(dir);
+		icVector3 end = icVector3((c_x + (dir.x * step)), (c_y + (dir.y * step)), (c_z + (dir.z * step)));
+
+		// part 3
+		c_x = end.x;
+		c_y = end.y;
+		c_z = end.z;
+
+		// part 4
+		if (c_x > poly->maxx || c_x < poly->minx || c_y > poly->maxy || c_y < poly->miny)
+			break;
+
+		LineSegment line = LineSegment(start, end);
+		contour.push_back(line);
+	}
+
+	// reset
+	c_x = x;
+	c_y = y;
+	c_z = z;
+
+	// trace backward
+	for (int i = 0; i < count; i++) {
+		// part 1
+		if (c_x > poly->maxx || c_x < poly->minx || c_y > poly->maxy || c_y < poly->miny)
+			continue;
+
+		// part 2
+		icVector3 start = icVector3(c_x, c_y, c_z);
+		icVector3 dir = -getDir(c_x, c_y, c_z);
+		normalize(dir);
+		icVector3 end = icVector3((c_x + dir.x * step), (c_y + dir.y * step), (c_z + dir.z * step));
+
+		// part 3
+		c_x = end.x;
+		c_y = end.y;
+		c_z = end.z;
+
+		// part 4
+		if (c_x > poly->maxx || c_x < poly->minx || c_y > poly->maxy || c_y < poly->miny)
+			break;
+
+		LineSegment line = LineSegment(start, end);
+		contour.push_back(line);
+	}
+}
+
+/******************************************************************************
 Process a keyboard action.  In particular, exit the program when an
 "escape" is pressed in the window.
 ******************************************************************************/
@@ -1041,6 +1177,26 @@ void keyboard(unsigned char key, int x, int y) {
 			temp_v->B = (max - scalar) / (max - min);
 			temp_v->z = 0.0;
 		}
+
+		glutPostRedisplay();
+	}
+	break;
+
+	// vector field
+	case '7': {
+		display_mode = 7;
+
+
+
+		glutPostRedisplay();
+	}
+	break;
+
+	// streamlines
+	case '8': {
+		display_mode = 8;
+
+
 
 		glutPostRedisplay();
 	}
