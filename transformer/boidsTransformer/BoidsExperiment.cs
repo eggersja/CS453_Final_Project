@@ -244,10 +244,10 @@ namespace boidsTransformer
         /// </summary>
         /// <param name="gridSize">The size of the .ply grid.</param>
         /// <returns>Traffic ply file</returns>
-        public string BoidPly(int gridSize = 21)
+        public string BoidPly(int gridSize = 21, float maxTime = float.PositiveInfinity)
         {
             // Get the trafic density
-            Tuple<float[][], float[][][]> gridWeights = ProjectBoidsToGrid(gridSize);
+            Tuple<float[][], float[][][]> gridWeights = ProjectBoidsToGrid(gridSize, maxTime);
             float[][] traffic = gridWeights.Item1;
             float[][][] paths = gridWeights.Item2;
             int faceCount = (gridSize - 1) * (gridSize - 1);
@@ -371,11 +371,14 @@ namespace boidsTransformer
                 }
                 // Special case for last snapshot; no next vector direction, so vector must be either considered zero or set to the last vector for that boid.
                 BoidsSnapshot lastSnapshot = Current[Current.Count - 1];
-                for (int j = 0; j < lastSnapshot.Coords.Count; j++)
+                if (lastSnapshot.Timestamp < maxTime)
                 {
-                    float[] coord = lastSnapshot.Coords[j];
-                    float[] direction = {0, 0, 0};
-                    DistributeBoidWeightOverQuad(ref trafficGrid, ref pathGrid, coord, direction, ref weightGrid, DeltaTime[Current.Count-1]);
+                    for (int j = 0; j < lastSnapshot.Coords.Count; j++)
+                    {
+                        float[] coord = lastSnapshot.Coords[j];
+                        float[] direction = { 0, 0, 0 };
+                        DistributeBoidWeightOverQuad(ref trafficGrid, ref pathGrid, coord, direction, ref weightGrid, DeltaTime[Current.Count - 1]);
+                    }
                 }
             }
             else if (mode == MappingMode.ALL_QUAD)
