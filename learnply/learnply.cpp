@@ -31,6 +31,36 @@ const double radius_factor = 1.0;
 int win_width = 800;
 int win_height = 800;
 float aspectRatio = win_width / win_height;
+
+/*file management related variables*/
+/// <remarks>Must equal the number of items in the array declared below.</remarks>
+const int LOADABLE_COUNT = 11;
+
+/// <summary>
+/// An array containing all of the paths to the files to load. Can be iterated through with <see cref="keyboard(unsigned char key, int x, int y)">'x'</see>
+/// </summary>
+/// <remarks>
+/// "../quadmesh_2D/fun_shapes/face.ply" for dummy
+/// </remarks>
+const char* LOAD_PATHS[LOADABLE_COUNT] = {
+	"../datasets/proc_boids_basic/basic.t1.boids.ply", // 0
+	"../datasets/proc_boids_basic/basic.t2.boids.ply", // 1
+	"../datasets/proc_boids_basic/basic.t3.boids.ply", // 2
+	"../datasets/proc_boids_basic/basic.t4.boids.ply", // 3
+	"../datasets/proc_boids_basic/basic.t5.boids.ply", // 4
+	"../datasets/proc_boids_basic/basic.t6.boids.ply", // 5
+	"../datasets/proc_boids_basic/basic.t7.boids.ply", // 6
+	"../datasets/proc_boids_basic/basic.t8.boids.ply", // 7 [...]
+	"../datasets/proc_boids_basic/basic.t9.boids.ply", // 8
+	"../datasets/proc_boids_basic/basic.t10.boids.ply", // 9
+	"../datasets/proc_boids_basic/basic.t11.boids.ply", // 10
+};
+
+/// <summary>
+/// Determines which scalar load path to use. Acceptable values are 0-7
+/// </summary>
+int load_selector = 0;
+
 /*
 Use keys 1 to 0 to switch among different display modes.
 Each display mode can be designed to show one type 
@@ -87,6 +117,13 @@ void display_selected_quad(Polyhedron* poly);
 void display_polyhedron(Polyhedron* poly);
 
 /*display utilities*/
+
+/*file management*/
+/// <summary>
+/// Loads a polyhedron from a file and outputs to the <see cref="poly"/> global variable.
+/// </summary>
+/// <param name="ply_path">The path to the polyhedron to be loaded. Must be in PLY format</param>
+void load_ply(char* ply_path);
 
 /*
 draw a sphere
@@ -188,10 +225,10 @@ Main program.
 int main(int argc, char* argv[])
 {
 	/*load mesh from ply file*/
-	FILE* this_file = fopen("../datasets/project_data/test.ply", "r");
-
-	poly = new Polyhedron(this_file);
-	fclose(this_file);
+	//Original path: "../quadmesh_2D/fun_shapes/face.ply"
+	char* to_load = new char[256];
+	strcpy(to_load, LOAD_PATHS[load_selector]);
+	load_ply(to_load);
 	
 	/*initialize the mesh*/
 	poly->initialize(); // initialize the mesh
@@ -986,6 +1023,18 @@ void keyboard(unsigned char key, int x, int y) {
 		//show the IBFV of the field
 		break;
 
+	case 'x': // Increment the load
+		poly->finalize();
+		load_selector = (load_selector + 1) % LOADABLE_COUNT;
+		char buffer[256];
+		strcpy(buffer, LOAD_PATHS[load_selector]);
+		load_ply(buffer);
+		poly->initialize(); // initialize the mesh
+		poly->write_info();
+		makePatterns();
+		printf("Loaded set %d (%s).\n", load_selector, buffer);
+		break;
+
 	case 'r':
 		mat_ident(rotmat);
 		translation[0] = 0;
@@ -1122,4 +1171,16 @@ void display_polyhedron(Polyhedron* poly)
 		displayIBFV();
 		break;
 	}
+}
+
+/******************************************************************************
+Assignment methods
+******************************************************************************/
+
+void load_ply(char* ply_path) {
+	FILE* this_file = fopen(ply_path, "r");
+	if (this_file == NULL)
+		throw EXCEPTION_READ_FAULT;
+	poly = new Polyhedron(this_file);
+	fclose(this_file);
 }
