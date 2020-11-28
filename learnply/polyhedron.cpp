@@ -9,6 +9,7 @@ The polygon data structure
 
 #include <math.h>
 #include <fstream>
+#include <iostream>
 #include "ply.h"
 #include "icVector.H"
 #include "icMatrix.H"
@@ -147,6 +148,14 @@ void Polyhedron::write_info()
 	printf("#verts: %d\n", nverts);
 	printf("#edges: %d\n", nedges);
 	printf("#faces: %d\n", nquads);
+}
+
+/******************************************************************************
+Changes thee polygon to a different file
+******************************************************************************/
+void changeFile(FILE* file)
+{
+	std::cout << "Unfinished" << std::endl;
 }
 
 /******************************************************************************

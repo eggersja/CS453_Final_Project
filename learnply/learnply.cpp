@@ -5,6 +5,7 @@
 #include <fstream>
 #include <vector>
 #include <iostream>
+#include <string>
 
 #include "glError.h"
 #include "gl/glew.h"
@@ -21,6 +22,7 @@ using std::cout;
 using std::cin;
 using std::endl;
 using std::vector;
+using std::string;
 
 Polyhedron* poly;
 
@@ -31,17 +33,12 @@ const double radius_factor = 1.0;
 int win_width = 800;
 int win_height = 800;
 float aspectRatio = win_width / win_height;
-/*
-Use keys 1 to 0 to switch among different display modes.
-Each display mode can be designed to show one type 
-visualization result.
-
-Predefined ones: 
-display mode 1: solid rendering
-display mode 2: show wireframes
-display mode 3: render each quad with colors of vertices
-*/
 int display_mode = 1;
+
+/* changing file variables */
+int current_t = 1;
+#define MAX_T 11
+#define MIN_T 1
 
 /*User Interaction related variabes*/
 float s_old, t_old;
@@ -68,6 +65,9 @@ Forward declaration of functions
 
 void init(void);
 void makePatterns(void);
+
+/* custom functions */
+void updatePolyFile(bool increase);
 
 /*glut attaching functions*/
 void keyboard(unsigned char key, int x, int y);
@@ -188,7 +188,7 @@ Main program.
 int main(int argc, char* argv[])
 {
 	/*load mesh from ply file*/
-	FILE* this_file = fopen("../datasets/proc_boids_basic/basic.t11.boids.ply", "r");
+	FILE* this_file = fopen("../datasets/proc_boids_basic/basic.t6.boids.ply", "r");
 	//FILE* this_file = fopen("../datasets/scalar_data/saddle_test.ply", "r");
 
 	poly = new Polyhedron(this_file);
@@ -906,6 +906,36 @@ void display(void)
 	CHECK_GL_ERROR();
 }
 
+/******************************************************************************
+Change the current polygon file to display new information
+NOTE: broken
+******************************************************************************/
+
+void updatePolyFile(bool increase) {
+	// change t
+	if (increase) {
+		if (current_t == MAX_T)
+			current_t = MIN_T;
+		else
+			current_t++;
+	} else {
+		if (current_t == MIN_T)
+			current_t = MAX_T;
+		else
+			current_t--;
+	}
+
+	// update poly file
+	string file_str = "../datasets/proc_boids_basic/basic.t" + std::to_string(current_t) + ".boids.ply"; // won't work, needs a const
+	FILE* this_file = fopen("../datasets/proc_boids_basic/basic.t11.boids.ply", "r"); // poly class is annoying
+	poly = new Polyhedron(this_file);
+	fclose(this_file);
+
+	// re-init mesh
+	poly->initialize(); // initialize the mesh
+	cout << "T: " << current_t << endl;
+	poly->write_info();
+}
 
 /******************************************************************************
 Process a keyboard action.  In particular, exit the program when an
@@ -916,8 +946,6 @@ Process a keyboard action.  In particular, exit the program when an
 PolyLine pentagon;
 
 void keyboard(unsigned char key, int x, int y) {
-	int i;
-
 	/* set escape key to exit */
 	switch (key) {
 	case 27:
@@ -987,7 +1015,7 @@ void keyboard(unsigned char key, int x, int y) {
 		//show the IBFV of the field
 		break;
 
-	// heatmap
+	// heatmap (coped hw1)
 	case '6': {
 		display_mode = 6;
 
@@ -1018,6 +1046,16 @@ void keyboard(unsigned char key, int x, int y) {
 	}
 	break;
 
+	/* increase/decrease t (broken) */
+	case 'z':
+		updatePolyFile(0);
+		glutPostRedisplay();
+		break;
+	case 'x':
+		updatePolyFile(1);
+		glutPostRedisplay();
+		break;
+
 	case 'r':
 		mat_ident(rotmat);
 		translation[0] = 0;
@@ -1027,7 +1065,6 @@ void keyboard(unsigned char key, int x, int y) {
 		break;
 	}
 }
-
 
 
 /******************************************************************************

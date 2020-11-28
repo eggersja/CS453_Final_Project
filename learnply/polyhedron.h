@@ -116,6 +116,7 @@ public:
 	/*utilties*/
 	Quad* find_common_edge(Quad*, Vertex*, Vertex*);
 	Quad* other_quad(Edge*, Quad*);
+	void changeFile(FILE* file);
 
 	/*feel free to add more to help youself*/
 	void write_info();
