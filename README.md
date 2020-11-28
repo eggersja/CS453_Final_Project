@@ -3,7 +3,7 @@ Final project for CS453.
 ## Data specification for raw_boids
 
 ```
-{timestamp}:{x_0},{y_0};{x_1},{y_1};...{x_(n-1)},{y_(n-1)};[cr][lf]
+{timestamp}:{x_0};{y_0}#{x_1},{y_1}#...{x_(n-1)};{y_(n-1)}#[cr][lf]
 ...[EOF]
 ```
 Where each ordered pair is the coordinate of the boid at that moment in time.
@@ -13,7 +13,7 @@ Where each ordered pair is the coordinate of the boid at that moment in time.
 Build the data transformer for release and then run with the syntax:
 `./transformer/boidsTransformer/bin/Release/net5.0/boidsTransformer.exe [Input files] -o [Output directory] -s [Resolution]`
 For example:
-`./transformer/boidsTransformer/bin/Release/net5.0/boidsTransformer.exe datasets/raw_boids_base/basic.t1.boids datasets/raw_boids_base/basic.t2.boids datasets/raw_boids_base/basic.t3.boids datasets/raw_boids_base/basic.t4.boids datasets/raw_boids_base/basic.t5.boids datasets/raw_boids_base/basic.t6.boids datasets/raw_boids_base/basic.t7.boids datasets/raw_boids_base/basic.t8.boids datasets/raw_boids_base/basic.t9.boids datasets/raw_boids_base/basic.t10.boids datasets/raw_boids_base/basic.t11.boids -o datasets/proc_boids_basic -s 49`
+`./transformer/boidsTransformer/bin/Release/net5.0/boidsTransformer.exe datasets/raw_boids_base/basic.t1.boids datasets/raw_boids_base/basic.t2.boids datasets/raw_boids_base/basic.t3.boids datasets/raw_boids_base/basic.t4.boids datasets/raw_boids_base/basic.t5.boids datasets/raw_boids_base/basic.t6.boids datasets/raw_boids_base/basic.t7.boids datasets/raw_boids_base/basic.t8.boids -o datasets/proc_boids_basic -s 49`
 (The execution of the above command took about 5 seconds on a developer PC).
 
 # Execution Parameters

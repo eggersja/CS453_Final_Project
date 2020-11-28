@@ -35,7 +35,7 @@ bool scene_lights_on = true;
 
 /*file management related variables*/
 /// <remarks>Must equal the number of items in the array declared below.</remarks>
-const int LOADABLE_COUNT = 11;
+const int LOADABLE_COUNT = 8;
 
 /// <summary>
 /// An array containing all of the paths to the files to load. Can be iterated through with <see cref="keyboard(unsigned char key, int x, int y)">'x'</see>
@@ -44,17 +44,14 @@ const int LOADABLE_COUNT = 11;
 /// "../quadmesh_2D/fun_shapes/face.ply" for dummy
 /// </remarks>
 const char* LOAD_PATHS[LOADABLE_COUNT] = {
-	"../datasets/scalar_data/saddle_test.ply", // 0
+	"../datasets/proc_boids_basic/basic.t1.boids.ply", // 0
 	"../datasets/proc_boids_basic/basic.t2.boids.ply", // 1
 	"../datasets/proc_boids_basic/basic.t3.boids.ply", // 2
 	"../datasets/proc_boids_basic/basic.t4.boids.ply", // 3
 	"../datasets/proc_boids_basic/basic.t5.boids.ply", // 4
 	"../datasets/proc_boids_basic/basic.t6.boids.ply", // 5
 	"../datasets/proc_boids_basic/basic.t7.boids.ply", // 6
-	"../datasets/proc_boids_basic/basic.t8.boids.ply", // 7 [...]
-	"../datasets/proc_boids_basic/basic.t9.boids.ply", // 8
-	"../datasets/proc_boids_basic/basic.t10.boids.ply", // 9
-	"../datasets/proc_boids_basic/basic.t11.boids.ply", // 10
+	"../datasets/proc_boids_basic/basic.t8.boids.ply" // 7
 };
 
 /// <summary>

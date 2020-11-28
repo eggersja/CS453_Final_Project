@@ -156,15 +156,16 @@ namespace boidsTransformer
             Current = new List<BoidsSnapshot>();
 
             // Reads the snapshot as a whole.
-            Regex snapshotReader = new Regex(@"(?<time>[\d\.\-]+):(?:(?:-?[\d\.]+),(?:-?[\d\.]+);)*",
+            Regex snapshotReader = new Regex(@"(?<time>[\d\.,\-]+):(?:(?:-?[\d,\.]+);(?:-?[\d,\.]+)#)*",
                 RegexOptions.Compiled | RegexOptions.IgnoreCase);
             // Reads each ordered pair in the snapshot.
-            Regex orderedPairFinder = new Regex(@"(?<coordx>-?[\d\.]+),(?<coordy>-?[\d\.]+);",
+            Regex orderedPairFinder = new Regex(@"(?<coordx>-?[\d,\.]+);(?<coordy>-?[\d,\.]+)#",
                 RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
 
             for (int i = 0; i < snapshotsRaw.Length; i++)
             { // For each snapshot
+                // Clean up erronious parts of the lines (no idea how those got there):
                 // Get the overallsnapshat data.
                 if (snapshotsRaw.Equals("") && i == snapshotsRaw.Length - 1) return; // Allow blank line at EOF.
                 Match parsedSnapshot = snapshotReader.Match(snapshotsRaw[i]);
@@ -212,12 +213,12 @@ namespace boidsTransformer
             boidCount = maxBoids;
         }
 
-        private void InitializeBounds(float margin = 0)
+        private void InitializeBounds(float margin = 0.1f)
         {
             if (Current.Count == 0 || Current[0].Coords.Count == 0)
                 return; // Can't calculate bounds on an empty experiment
             BoidsSnapshot firstSnapshot = Current[0];
-            bounds = new float[] { firstSnapshot.Coords[0][0], firstSnapshot.Coords[0][1], firstSnapshot.Coords[0][0], firstSnapshot.Coords[0][1] };
+            bounds = new float[] { firstSnapshot.Coords[0][0] - margin, firstSnapshot.Coords[0][1] - margin, firstSnapshot.Coords[0][0] + margin, firstSnapshot.Coords[0][1] + margin };
 
             for(int i = 0; i < Current.Count; i++)
             {
@@ -225,14 +226,14 @@ namespace boidsTransformer
                 for(int j = 0; j < s.Coords.Count; j++)
                 {
                     float[] c = s.Coords[j];
-                    if (c[0] < bounds[0])
-                        bounds[0] = c[0];
-                    if (c[1] < bounds[1])
-                        bounds[1] = c[1];
-                    if (c[0] > bounds[2])
-                        bounds[2] = c[0];
-                    if (c[1] > bounds[3])
-                        bounds[3] = c[1];
+                    if (c[0] - margin < bounds[0])
+                        bounds[0] = c[0] - margin;
+                    if (c[1] - margin < bounds[1])
+                        bounds[1] = c[1] - margin;
+                    if (c[0] + margin > bounds[2])
+                        bounds[2] = c[0] + margin;
+                    if (c[1] + margin > bounds[3])
+                        bounds[3] = c[1] + margin;
                 }
             }
             //throw new System.NotImplementedException();
@@ -431,6 +432,10 @@ namespace boidsTransformer
             targetVertexBoidSpace[2] = new float[] { (targetGridIndicies[2][0] * cellSize[0]) + bounds[0], (targetGridIndicies[2][1] * cellSize[1]) + bounds[1] };
             targetVertexBoidSpace[3] = new float[] { (targetGridIndicies[3][0] * cellSize[0]) + bounds[0], (targetGridIndicies[3][1] * cellSize[1]) + bounds[1] };
 
+            // Diagnosed the problem with this:
+            // if((xLowerIndex == 10 || xUpperIndex == 10) && (yLowerIndex == 10 || yUpperIndex == 10))
+            //    Console.WriteLine("At (10,10): " + boidCoords[0] + ", " + boidCoords[1]);
+
             // Calculate distance to corners of quad.
             float[] distances = new float[4];
             float distanceSum = 0;
@@ -444,6 +449,8 @@ namespace boidsTransformer
             // Add the weighted values to the underlying grids.
             for (int i = 0; i < 4; i++)
             {
+                if (targetGridIndicies[i][0] < 0 || trafficGrid[i][1] < 0)
+                    Console.WriteLine("There's your problem. Row: " + targetGridIndicies[i][0] + " Col: " + trafficGrid[i][1] + "; boid: " +boidCoords[0] + ", " + boidCoords[1]);
                 // Scalar data: Relative traffic at that vertex. Appply time-based weighting.
                 trafficGrid[targetGridIndicies[i][0]][targetGridIndicies[i][1]] += trafficWeight - (trafficWeight * (distances[i] / distanceSum));
                 // Vector data: Path at that vertex. Do not apply time-based weighting; vectors should already account for this.

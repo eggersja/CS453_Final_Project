@@ -7,7 +7,7 @@ namespace boidsTransformer
     public class Program
     {
         const string DEFAULT_OUTPUT_DIRECTORY = "o";
-        public static readonly float[] KNOWN_BOUNDS = { -1000f, -1000f, 1000f, 1000f }; // this isn't supplied in raw data file (sorry)
+        public static readonly float[] KNOWN_BOUNDS = { -1500f, -1500f, 1500f, 1500f }; // this isn't supplied in raw data file (sorry)
         public static readonly int DEFAULT_GRID_SIZE = 21;
 
         /// <summary>

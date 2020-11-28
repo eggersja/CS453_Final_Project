@@ -13,11 +13,11 @@ namespace boidTest
     /// </summary>
     public class transformerTests
     {
-        public static readonly string SYNTHETIC_EASY = "10.0:20.0,30.0;40.0,50.0;";
+        public static readonly string SYNTHETIC_EASY = "10.0:20.0;30.0#40.0;50.0#";
         
         public static readonly float[] SYNTHETIC_EASY_ANSWERS = { 10f, 20f, 30f, 40f, 50f };
         
-        public static readonly string SYNTHETIC_MEDIUM = "0.01:0,3234.43;-20.4,887;";
+        public static readonly string SYNTHETIC_MEDIUM = "0.01:0;3234.43#-20.4;887#";
         
         public static readonly float[] SYNTHETIC_MEDIUM_ANSWERS = { 0.01f, 0f, 3234.43f, -20.4f, 887f };
 
