@@ -31,6 +31,7 @@ const double radius_factor = 1.0;
 int win_width = 800;
 int win_height = 800;
 float aspectRatio = win_width / win_height;
+bool scene_lights_on = true;
 
 /*file management related variables*/
 /// <remarks>Must equal the number of items in the array declared below.</remarks>
@@ -43,7 +44,7 @@ const int LOADABLE_COUNT = 11;
 /// "../quadmesh_2D/fun_shapes/face.ply" for dummy
 /// </remarks>
 const char* LOAD_PATHS[LOADABLE_COUNT] = {
-	"../datasets/proc_boids_basic/basic.t1.boids.ply", // 0
+	"../datasets/scalar_data/saddle_test.ply", // 0
 	"../datasets/proc_boids_basic/basic.t2.boids.ply", // 1
 	"../datasets/proc_boids_basic/basic.t3.boids.ply", // 2
 	"../datasets/proc_boids_basic/basic.t4.boids.ply", // 3
@@ -70,6 +71,9 @@ Predefined ones:
 display mode 1: solid rendering
 display mode 2: show wireframes
 display mode 3: render each quad with colors of vertices
+display mode 4: Drawing example
+display mode 5: Image-based Flow Visualization (IBFV)
+display mode 6: Grayscale scalar field.
 */
 int display_mode = 1;
 
@@ -118,12 +122,25 @@ void display_polyhedron(Polyhedron* poly);
 
 /*display utilities*/
 
+void scalar_bounds(Polyhedron* poly, double* lower, double* upper);
+
+void display_grayscale_quad(Quad* qu, double lower, double upper);
+
+void display_bicolor_quad(Quad* qu, double lower, double upper, float lower_color[3], float upper_color[3]);
+
+void display_heightmod_quad(Quad* qu, double lower, double upper, float ref_color[3], float peak);
+
+void display_grayscale_heightmod_quad(Quad* qu, double lower, double upper, float peak);
+
+void display_bicolor_heightmod_quad(Quad* qu, double lower, double upper, float lower_color[3], float upper_color[3], float peak);
+
 /*file management*/
 /// <summary>
 /// Loads a polyhedron from a file and outputs to the <see cref="poly"/> global variable.
 /// </summary>
 /// <param name="ply_path">The path to the polyhedron to be loaded. Must be in PLY format</param>
 void load_ply(char* ply_path);
+
 
 /*
 draw a sphere
@@ -1023,6 +1040,11 @@ void keyboard(unsigned char key, int x, int y) {
 		//show the IBFV of the field
 		break;
 
+	case '6':
+		display_mode = 6;
+		glutPostRedisplay();
+		break;
+
 	case 'x': // Increment the load
 		poly->finalize();
 		load_selector = (load_selector + 1) % LOADABLE_COUNT;
@@ -1061,6 +1083,9 @@ void display_polyhedron(Polyhedron* poly)
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glShadeModel(GL_SMOOTH);
 	CHECK_GL_ERROR();
+
+	double lower, upper;
+	scalar_bounds(poly, &lower, &upper); // Find bounds
 
 	switch (display_mode) {
 	case 1:
@@ -1170,6 +1195,27 @@ void display_polyhedron(Polyhedron* poly)
 	case 5:
 		displayIBFV();
 		break;
+
+	case 6:
+		/*glEnable(GL_LIGHTING);
+		glEnable(GL_LIGHT0);
+		glEnable(GL_LIGHT1);
+
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		GLfloat mat_diffuse[4] = { 1.0, 1.0, 0.0, 0.0 };
+		GLfloat mat_specular[] = { 1.0, 1.0, 1.0, 1.0 };
+		glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
+		glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
+		glMaterialf(GL_FRONT, GL_SHININESS, 50.0);*/
+
+		for (int i = 0; i < poly->nquads; i++) {
+			Quad* temp_q = poly->qlist[i];
+			display_grayscale_heightmod_quad(temp_q, lower, upper, 0);
+		}
+
+		CHECK_GL_ERROR();
+
+		break;
 	}
 }
 
@@ -1183,4 +1229,104 @@ void load_ply(char* ply_path) {
 		throw EXCEPTION_READ_FAULT;
 	poly = new Polyhedron(this_file);
 	fclose(this_file);
+}
+
+// Scalar fields
+
+void scalar_bounds(Polyhedron* poly, double* lower, double* upper)
+{
+	*lower = poly->vlist[0]->scalar;
+	*upper = poly->vlist[0]->scalar;
+	for (int i = 1; i < poly->nverts; i++) {
+		if (poly->vlist[i]->scalar < *lower)
+			*lower = poly->vlist[i]->scalar;
+		if (poly->vlist[i]->scalar > *upper)
+			*upper = poly->vlist[i]->scalar;
+	}
+}
+
+/*
+* Quad rendering. Useful reference:
+* glColor3f(temp_v->R, temp_v->G, temp_v->B);
+* glVertex3d(temp_v->x, temp_v->y, temp_v->z);
+*/
+
+/// <summary>
+/// Displays a quadrilateal to the screen, formatted in grayscale by its scalar data
+/// </summary>
+/// <param name="qu">The quadrilateral to display</param>
+/// <param name="lower">The minimum value considered "black", generally taken from the mesh the quad was extracted from</param>
+/// <param name="upper">The maximum value considered "white", generally taken from the mesh the quad was extracted from</param>
+void display_grayscale_quad(Quad* qu, double lower, double upper) {
+	// I could bear to define const color aliases, but for now this will do.
+	float black[3] = { 0, 0, 0 };
+	float white[3] = { 1, 1, 1 };
+	display_bicolor_quad(qu, lower, upper, black, white);
+}
+
+/// <summary>
+/// Displays a quadrilateal to the screen, formatted in pretty colors by its scalar data
+/// </summary>
+/// <param name="qu">The quadrilateral to display</param>
+/// <param name="lower">The minimum value considered "lower_color", generally taken from the mesh the quad was extracted from</param>
+/// <param name="upper">The maximum value considered "upper_color", generally taken from the mesh the quad was extracted from</param>
+/// <param name="lower_color">The color to associate with low scalar values</param>
+/// <param name="upper_color">The color to associate with high scalar values</param>
+void display_bicolor_quad(Quad* qu, double lower, double upper, float lower_color[3], float upper_color[3]) {
+	display_bicolor_heightmod_quad(qu, lower, upper, lower_color, upper_color, 0);
+}
+
+/// <summary>
+/// Displays a quad with its magnitude set in the z direction proportional to the scaler.
+/// </summary>
+/// <param name="qu">The quadrilateral to display</param>
+/// <param name="lower">The scaler value to consider "zero" in the projection sense.</param>
+/// <param name="upper">The scaler value to consider "very high" in the projection sense.</param>
+void display_heightmod_quad(Quad* qu, double lower, double upper, float ref_color[3], float peak) {
+	//float ref_color[3] = { qu->verts[0]->R, qu->verts[0]->G, qu->verts[0]->B };
+	display_bicolor_heightmod_quad(qu, lower, upper, ref_color, ref_color, peak);
+}
+
+/// <summary>
+/// Displays a quad with its magnitude multiplied by its scaler in a single direction and shaded in grayscale.<br/>
+/// No, I don't mean shaders, that's another can of worms.
+/// </summary>
+/// <param name="qu">The quadrilateral to display</param>
+/// <param name="lower">The scaler value to consider "zero" in the projection sense and "black" in the color sense.</param>
+/// <param name="upper">The scaler value to consider "very high" in the projection sense and "white" in the color sense.</param>
+void display_grayscale_heightmod_quad(Quad* qu, double lower, double upper, float peak) {
+	float black[3] = { 0, 0, 0 };
+	float white[3] = { 1, 1, 1 };
+	display_bicolor_heightmod_quad(qu, lower, upper, black, white, peak);
+}
+
+/// <summary>
+/// Displays a quad with its magnitude multiplied by its scaler in a single direction and colored.<br/>
+/// We assume all datasets have a fixed z coordinate, so we use this to demonstrate height mapping.
+/// </summary>
+/// <param name="qu">The quadrilateral to display</param>
+/// <param name="lower">The scaler value to consider "zero" in the projection sense and "lower_color" in the color sense.</param>
+/// <param name="upper">The scaler value to consider "very high" in the projection sense and "upper_color" in the color sense.</param>
+/// <param name="lower_color">The color to associate with low scalar values</param>
+/// <param name="upper_color">The color to associate with high scalar values</param>
+void display_bicolor_heightmod_quad(Quad* qu, double lower, double upper, float lower_color[3], float upper_color[3], float peak) {
+	unsigned int i;
+
+	glBegin(GL_POLYGON);
+	for (i = 0; i < 4; i++) {
+		Vertex* ve = qu->verts[i];
+		double sca = ve->scalar;
+
+		// Part 1: Color
+		float interlopated_color[3] = { 0,0,0 };
+		for (int j = 0; j < 3; j++)
+			interlopated_color[j] = lower_color[j] * ((sca - lower) / (upper - lower))
+			+ upper_color[j] * ((upper - sca) / (upper - lower));
+		glColor3f(interlopated_color[0], interlopated_color[1], interlopated_color[2]);
+		//printf("%f,%f,%f\n", interlopated_color[0], interlopated_color[1], interlopated_color[2]);
+		// Part 2: Location
+		float interlopated_height = peak * ((sca - lower) / (upper - lower));
+		glVertex3d(ve->x, ve->y, interlopated_height);
+	}
+	glEnd();
 }
