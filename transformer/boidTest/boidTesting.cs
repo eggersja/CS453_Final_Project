@@ -13,11 +13,11 @@ namespace boidTest
     /// </summary>
     public class transformerTests
     {
-        public static readonly string SYNTHETIC_EASY = "10.0:20.0,30.0;40.0,50.0;";
+        public static readonly string SYNTHETIC_EASY = "10.0:20.0;30.0#40.0;50.0#";
         
         public static readonly float[] SYNTHETIC_EASY_ANSWERS = { 10f, 20f, 30f, 40f, 50f };
         
-        public static readonly string SYNTHETIC_MEDIUM = "0.01:0,3234.43;-20.4,887;";
+        public static readonly string SYNTHETIC_MEDIUM = "0.01:0;3234.43#-20.4;887#";
         
         public static readonly float[] SYNTHETIC_MEDIUM_ANSWERS = { 0.01f, 0f, 3234.43f, -20.4f, 887f };
 
@@ -172,6 +172,33 @@ namespace boidTest
             if (File.Exists(outFile))
                 File.Delete(outFile);
             string[] args = { BASIC_TEST_DATA_PATH, "-o", TEST_OUTPUT_DIRECTORY.Substring(0, TEST_OUTPUT_DIRECTORY.Length - 1), "-s", "49" };
+
+            // Execute
+            Program.Main(args);
+
+            // Test
+            FileAssert.Exists(outFile, "Program failed to create " + outFile);
+            // Cleanup
+            File.Delete(outFile);
+        }
+
+        /// <summary>
+        /// Runs the <see cref="Program.Main(string[])">main method</see> on the <see cref="TEST_OUTPUT_DIRECTORY">sample data</see>,
+        /// producing output <c>.ply</c> data to <see cref="TEST_OUTPUT_DIRECTORY"/><c>/o/basic.t1.boids.ply</c>. Cuts the time of the test dataset to 30 seconds.
+        /// </summary>
+        [Test]
+        public void IntegrationSuccessTimeSlice()
+        {
+            // Sanity check
+            FileAssert.Exists(BASIC_TEST_DATA_PATH, "The file " + BASIC_TEST_DATA_PATH + " was moved or is missing.\n" +
+                "This test will not work without a proper test file in this location that has at least one boid.\n" +
+                "(Present execution directory: " + Directory.GetCurrentDirectory() + ")");
+
+            // Setup
+            string outFile = TEST_OUTPUT_DIRECTORY + "basic.t1.boids.ply";
+            if (File.Exists(outFile))
+                File.Delete(outFile);
+            string[] args = { BASIC_TEST_DATA_PATH, "-o", TEST_OUTPUT_DIRECTORY.Substring(0, TEST_OUTPUT_DIRECTORY.Length - 1), "-t", "30" };
 
             // Execute
             Program.Main(args);

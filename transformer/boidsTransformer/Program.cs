@@ -7,8 +7,9 @@ namespace boidsTransformer
     public class Program
     {
         const string DEFAULT_OUTPUT_DIRECTORY = "o";
-        public static readonly float[] KNOWN_BOUNDS = { -1000f, -1000f, 1000f, 1000f }; // this isn't supplied in raw data file (sorry)
+        public static readonly float[] KNOWN_BOUNDS = { -1500f, -1500f, 1500f, 1500f }; // this isn't supplied in raw data file (sorry)
         public static readonly int DEFAULT_GRID_SIZE = 21;
+        private static readonly float DEFAULT_MAX_TIME = float.PositiveInfinity;
 
         /// <summary>
         /// Converts a raw log output from the Boids Simulator (early release) to .ply format.
@@ -27,9 +28,10 @@ namespace boidsTransformer
             List<BoidsExperiment> experiments = new List<BoidsExperiment>();
             string outputDirectory = DEFAULT_OUTPUT_DIRECTORY;
             int gridSize = DEFAULT_GRID_SIZE;
+            float maxTime = DEFAULT_MAX_TIME;
 
             // Get input
-            InterpretArguments(args, inputFiles, ref outputDirectory, ref gridSize);
+            InterpretArguments(args, inputFiles, ref outputDirectory, ref gridSize, ref maxTime);
 
             // Process input
             for(int i = 0; i < inputFiles.Count; i++)
@@ -49,11 +51,11 @@ namespace boidsTransformer
             // Write output
             for (int i = 0; i < experiments.Count; i++)
             {
-                File.WriteAllText(outputDirectory + "/" + Path.GetFileName(inputFiles[i]) + ".ply", experiments[i].BoidPly(gridSize));
+                File.WriteAllText(outputDirectory + "/" + Path.GetFileName(inputFiles[i]) + ".ply", experiments[i].BoidPly(gridSize, maxTime));
             }
         }
 
-        protected static void InterpretArguments(string[] args, List<string> inputFiles, ref string outputDirectory, ref int gridRes)
+        protected static void InterpretArguments(string[] args, List<string> inputFiles, ref string outputDirectory, ref int gridRes, ref float maxTime)
         {
             for (int i = 0; i < args.Length; i++)
             {
@@ -89,6 +91,25 @@ namespace boidsTransformer
                                 Console.WriteLine(args[i + 1] + " must be positive!");
                             else
                                 gridRes = newRes;
+                        }
+                        i++;
+                    }
+                }
+                else if (args[i] == "-t")
+                { // Handle maxTime flag
+                    if (i == args.Length - 1)
+                    {
+                        Console.WriteLine("Argument \"-t\" supplied with no following time.\n"
+                            + "Assuming default: " + maxTime);
+                    }
+                    else
+                    {
+                        float newTime;
+                        if (!float.TryParse(args[i + 1], out newTime))
+                            Console.WriteLine(args[i + 1] + " is not a float!");
+                        else
+                        {
+                            maxTime = newTime;
                         }
                         i++;
                     }
