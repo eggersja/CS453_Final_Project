@@ -27,8 +27,9 @@ using std::string;
 Polyhedron* poly;
 
 /* random globals */
-PolyLine streamline_picked;
 vector<PolyLine> streamlines;
+vector<Vertex*> vectors;
+bool displayStreamlines = false;
 
 /*scene related variables*/
 const float zoomspeed = 0.9;
@@ -113,9 +114,10 @@ void init(void);
 void makePatterns(void);
 
 /* custom functions */
-void updatePolyFile(bool increase);
 void extract_streamline(double, double, double, PolyLine&);
 icVector3 getDir(double, double, double);
+void gatherStreamlines();
+void gatherVectors();
 
 /*glut attaching functions*/
 void keyboard(unsigned char key, int x, int y);
@@ -263,7 +265,7 @@ int main(int argc, char* argv[])
 	
 	/*initialize the mesh*/
 	poly->initialize(); // initialize the mesh
-	poly->write_info();
+	// poly->write_info();
 
 
 	/*init glut and create window*/
@@ -973,35 +975,37 @@ void display(void)
 	CHECK_GL_ERROR();
 }
 
+
 /******************************************************************************
-Change the current polygon file to display new information
-NOTE: broken
+Collects a bunch of streamlines in a mesh
 ******************************************************************************/
 
-void updatePolyFile(bool increase) {
-	// change t
-	if (increase) {
-		if (current_t == MAX_T)
-			current_t = MIN_T;
-		else
-			current_t++;
-	} else {
-		if (current_t == MIN_T)
-			current_t = MAX_T;
-		else
-			current_t--;
+void gatherStreamlines() {
+	streamlines.clear();
+
+	for (int i = 0; i < poly->nverts; i += 3) {
+		int x = poly->vlist[i]->x;
+		int y = poly->vlist[i]->y;
+
+		PolyLine line;
+		extract_streamline(x, y, 0, line);
+		streamlines.push_back(line);
 	}
+}
 
-	// update poly file
-	string file_str = "../datasets/proc_boids_basic/basic.t" + std::to_string(current_t) + ".boids.ply"; // won't work, needs a const
-	FILE* this_file = fopen("../datasets/proc_boids_basic/basic.t11.boids.ply", "r"); // poly class is annoying
-	poly = new Polyhedron(this_file);
-	fclose(this_file);
+/******************************************************************************
+Collects a bunch of vectors in a mesh
+******************************************************************************/
 
-	// re-init mesh
-	poly->initialize(); // initialize the mesh
-	cout << "T: " << current_t << endl;
-	poly->write_info();
+void gatherVectors() {
+	vectors.clear();
+	int vertsPerRow = sqrt(poly->nverts);
+
+	for (int i = vertsPerRow + 1; i < poly->nverts - vertsPerRow - 1; i++) {
+		if ( (i % vertsPerRow != 0) && ((i + 1)  % vertsPerRow != 0) )
+			if (poly->vlist[i]->scalar)
+				vectors.push_back(poly->vlist[i]);
+	}
 }
 
 /******************************************************************************
@@ -1216,20 +1220,24 @@ void keyboard(unsigned char key, int x, int y) {
 	// vector field
 	case '7': {
 		display_mode = 7;
-
-
+		
+		if (!vectors.size())
+			gatherVectors();
 
 		glutPostRedisplay();
 	}
 	break;
 
 	// streamlines
-	case '8': {
-		display_mode = 8;
-
-
-
-		glutPostRedisplay();
+	case 't': {
+		if (displayStreamlines)
+			streamlines.clear();
+		else {
+			gatherStreamlines();
+			cout << "Displaying streamlines...\n";
+		}
+		
+		displayStreamlines = !displayStreamlines;
 	}
 	break;
 
@@ -1241,9 +1249,12 @@ void keyboard(unsigned char key, int x, int y) {
 		strcpy(buffer, LOAD_PATHS[load_selector]);
 		load_ply(buffer);
 		poly->initialize(); // initialize the mesh
-		poly->write_info();
+		// poly->write_info();
 		makePatterns();
+		if (displayStreamlines) gatherStreamlines();
+		if (display_mode == 7) gatherVectors();
 		printf("Loaded set %d (%s).\n", load_selector, buffer);
+		
 	}
 	break;
 
@@ -1299,6 +1310,12 @@ void display_polyhedron(Polyhedron* poly)
 					glVertex3d(temp_v->x, temp_v->y, temp_v->z);
 				}
 				glEnd();
+			}
+
+			// doesn't work? not sure why
+			if (displayStreamlines) {
+				for (int i = 0; i < streamlines.size(); i++)
+					drawPolyline(streamlines[i], 2.0, 1.0, 0.0, 0.0);
 			}
 
 			CHECK_GL_ERROR();
@@ -1386,25 +1403,33 @@ void display_polyhedron(Polyhedron* poly)
 			break;
 
 		case 6: {
-			/*glEnable(GL_LIGHTING);
-			glEnable(GL_LIGHT0);
-			glEnable(GL_LIGHT1);
-
-			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-			GLfloat mat_diffuse[4] = { 1.0, 1.0, 0.0, 0.0 };
-			GLfloat mat_specular[] = { 1.0, 1.0, 1.0, 1.0 };
-			glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
-			glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
-			glMaterialf(GL_FRONT, GL_SHININESS, 50.0);*/
+			float red[3]  = { 1.0, 0.0, 0.0 };
+			float blue[3] = { 0.0, 0.0, 1.0 };
 
 			for (int i = 0; i < poly->nquads; i++) {
 				Quad* temp_q = poly->qlist[i];
-				display_grayscale_heightmod_quad(temp_q, lower, upper, 0);
+				display_bicolor_quad(temp_q, lower, upper, red, blue);
 			}
-
-			CHECK_GL_ERROR();
 		}
-		break;		
+		break;
+		
+		case 7: {
+			for (int i = 0; i < vectors.size(); i++)
+				drawDot(vectors.at(i)->x, vectors.at(i)->y, 0, 0.25, 1, 1, 1);
+
+			glDisable(GL_LIGHTING);
+			for (int i = 0; i < poly->nquads; i++) {
+				Quad* temp_q = poly->qlist[i];
+				glBegin(GL_POLYGON);
+				for (int j = 0; j < 4; j++) {
+					Vertex* temp_v = temp_q->verts[j];
+					glColor3f(0.0, 0.0, 0.0);
+					glVertex3d(temp_v->x, temp_v->y, temp_v->z);
+				}
+				glEnd();
+			}
+		}
+		break;
 	}
 }
 

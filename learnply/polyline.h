@@ -1,6 +1,7 @@
 #pragma once
 #include "icVector.H"
 #include <vector>
+#include <iostream>
 
 class LineSegment
 {
