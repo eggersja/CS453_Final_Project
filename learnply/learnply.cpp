@@ -5,6 +5,7 @@
 #include <fstream>
 #include <vector>
 #include <iostream>
+#include <string>
 
 #include "glError.h"
 #include "gl/glew.h"
@@ -21,8 +22,17 @@ using std::cout;
 using std::cin;
 using std::endl;
 using std::vector;
+using std::string;
 
 Polyhedron* poly;
+
+/* random globals */
+bool showPickedPoint = false;
+bool showSingularities = false;
+bool showAllStreamlines = false;
+icVector3 pickedPoint;
+PolyLine streamline_picked;
+vector<PolyLine> streamlines;
 
 /*scene related variables*/
 const float zoomspeed = 0.9;
@@ -31,6 +41,7 @@ const double radius_factor = 1.0;
 int win_width = 800;
 int win_height = 800;
 float aspectRatio = win_width / win_height;
+
 bool scene_lights_on = true;
 
 /*file management related variables*/
@@ -74,6 +85,11 @@ display mode 6: Grayscale scalar field.
 */
 int display_mode = 1;
 
+/* changing file variables */
+int current_t = 1;
+#define MAX_T 11
+#define MIN_T 1
+
 /*User Interaction related variabes*/
 float s_old, t_old;
 float rotmat[4][4];
@@ -99,6 +115,11 @@ Forward declaration of functions
 
 void init(void);
 void makePatterns(void);
+
+/* custom functions */
+void updatePolyFile(bool increase);
+void extract_streamline(double, double, double, PolyLine&);
+icVector3 getDir(double, double, double);
 
 /*glut attaching functions*/
 void keyboard(unsigned char key, int x, int y);
@@ -956,6 +977,162 @@ void display(void)
 	CHECK_GL_ERROR();
 }
 
+/******************************************************************************
+Change the current polygon file to display new information
+NOTE: broken
+******************************************************************************/
+
+void updatePolyFile(bool increase) {
+	// change t
+	if (increase) {
+		if (current_t == MAX_T)
+			current_t = MIN_T;
+		else
+			current_t++;
+	} else {
+		if (current_t == MIN_T)
+			current_t = MAX_T;
+		else
+			current_t--;
+	}
+
+	// update poly file
+	string file_str = "../datasets/proc_boids_basic/basic.t" + std::to_string(current_t) + ".boids.ply"; // won't work, needs a const
+	FILE* this_file = fopen("../datasets/proc_boids_basic/basic.t11.boids.ply", "r"); // poly class is annoying
+	poly = new Polyhedron(this_file);
+	fclose(this_file);
+
+	// re-init mesh
+	poly->initialize(); // initialize the mesh
+	cout << "T: " << current_t << endl;
+	poly->write_info();
+}
+
+/******************************************************************************
+Custom function for finding the direction at a specific point
+******************************************************************************/
+
+icVector3 getDir(double x, double y, double z) {
+	Quad* q = NULL;
+	double x1, x2, y1, y2;
+
+	// find quad the point's in
+	for (int i = 0; i < poly->nquads; i++) {
+		q = poly->qlist[i];
+
+		/* find x1, x2, y1, y2
+		   [1] . . . [0]
+			.         .
+			.         .
+			.         .
+		   [2] . . . [3]
+		*/
+		x1 = q->verts[2]->x;
+		y1 = q->verts[2]->y;
+		x2 = q->verts[0]->x;
+		y2 = q->verts[0]->y;
+
+		if (x <= x2 && x >= x1 && y <= y2 && y >= y1)
+			break; // found
+	}
+
+	// find k (usually just 2)
+	int k = -1;
+	for (int i = 0; i < 4; i++) {
+		if (q->verts[i]->x == x1 && q->verts[i]->y == y1)
+			k = i;
+	}
+
+	// find dirX
+	double fx1y1 = q->verts[k]->vx;
+	double fx2y1 = q->verts[(k + 1) % 4]->vx;
+	double fx2y2 = q->verts[(k + 2) % 4]->vx;
+	double fx1y2 = q->verts[(k + 3) % 4]->vx;
+
+	double p1 = ((x2 - x) / (x2 - x1)) * ((y2 - y) / (y2 - y1));
+	double p2 = ((x - x1) / (x2 - x1)) * ((y2 - y) / (y2 - y1));
+	double p3 = ((x2 - x) / (x2 - x1)) * ((y - y1) / (y2 - y1));
+	double p4 = ((x - x1) / (x2 - x1)) * ((y - y1) / (y2 - y1));
+
+	double dirX = (p1 * fx1y1) + (p2 * fx2y1) + (p3 * fx1y2) + (p4 * fx2y2);
+
+	// find dirY
+	fx1y1 = q->verts[k]->vy;
+	fx2y1 = q->verts[(k + 1) % 4]->vy;
+	fx2y2 = q->verts[(k + 2) % 4]->vy;
+	fx1y2 = q->verts[(k + 3) % 4]->vy;
+
+	double dirY = (p1 * fx1y1) + (p2 * fx2y1) + (p3 * fx1y2) + (p4 * fx2y2);
+
+	return icVector3(dirX, dirY, 0);
+}
+
+/******************************************************************************
+Custom function for extracting a files streamline
+******************************************************************************/
+
+void extract_streamline(double x, double y, double z, PolyLine& contour) {
+	double step = .25;
+	int count = 1500;
+	double c_x = x;
+	double c_y = y;
+	double c_z = z;
+
+	// trace forward
+	for (int i = 0; i < count; i++) {
+		// part 1
+		if (c_x > poly->maxx || c_x < poly->minx || c_y > poly->maxy || c_y < poly->miny)
+			continue;
+
+		// part 2
+		icVector3 start = icVector3(c_x, c_y, c_z);
+		icVector3 dir = getDir(c_x, c_y, c_z);
+		normalize(dir);
+		icVector3 end = icVector3((c_x + (dir.x * step)), (c_y + (dir.y * step)), (c_z + (dir.z * step)));
+
+		// part 3
+		c_x = end.x;
+		c_y = end.y;
+		c_z = end.z;
+
+		// part 4
+		if (c_x > poly->maxx || c_x < poly->minx || c_y > poly->maxy || c_y < poly->miny)
+			break;
+
+		LineSegment line = LineSegment(start, end);
+		contour.push_back(line);
+	}
+
+	// reset
+	c_x = x;
+	c_y = y;
+	c_z = z;
+
+	// trace backward
+	for (int i = 0; i < count; i++) {
+		// part 1
+		if (c_x > poly->maxx || c_x < poly->minx || c_y > poly->maxy || c_y < poly->miny)
+			continue;
+
+		// part 2
+		icVector3 start = icVector3(c_x, c_y, c_z);
+		icVector3 dir = -getDir(c_x, c_y, c_z);
+		normalize(dir);
+		icVector3 end = icVector3((c_x + dir.x * step), (c_y + dir.y * step), (c_z + dir.z * step));
+
+		// part 3
+		c_x = end.x;
+		c_y = end.y;
+		c_z = end.z;
+
+		// part 4
+		if (c_x > poly->maxx || c_x < poly->minx || c_y > poly->maxy || c_y < poly->miny)
+			break;
+
+		LineSegment line = LineSegment(start, end);
+		contour.push_back(line);
+	}
+}
 
 /******************************************************************************
 Process a keyboard action.  In particular, exit the program when an
@@ -966,8 +1143,6 @@ Process a keyboard action.  In particular, exit the program when an
 PolyLine pentagon;
 
 void keyboard(unsigned char key, int x, int y) {
-	int i;
-
 	/* set escape key to exit */
 	switch (key) {
 	case 27:
@@ -1036,13 +1211,34 @@ void keyboard(unsigned char key, int x, int y) {
 		display_mode = 5;
 		//show the IBFV of the field
 		break;
-
-	case '6':
+      
+  case '6':
 		display_mode = 6;
 		glutPostRedisplay();
 		break;
 
-	case 'x': // Increment the load
+	// vector field
+	case '7': {
+		display_mode = 7;
+
+
+
+		glutPostRedisplay();
+	}
+	break;
+
+	// streamlines
+	case '8': {
+		display_mode = 8;
+
+
+
+		glutPostRedisplay();
+	}
+	break;
+
+  // Increment the load
+	case 'x':
 		poly->finalize();
 		load_selector = (load_selector + 1) % LOADABLE_COUNT;
 		char buffer[256];
@@ -1065,7 +1261,6 @@ void keyboard(unsigned char key, int x, int y) {
 }
 
 
-
 /******************************************************************************
 Diaplay the polygon with visualization results
 ******************************************************************************/
@@ -1085,112 +1280,127 @@ void display_polyhedron(Polyhedron* poly)
 	scalar_bounds(poly, &lower, &upper); // Find bounds
 
 	switch (display_mode) {
-	case 1:
-	{
-		glEnable(GL_LIGHTING);
-		glEnable(GL_LIGHT0);
-		glEnable(GL_LIGHT1);
+		case 1:
+		{
+			glEnable(GL_LIGHTING);
+			glEnable(GL_LIGHT0);
+			glEnable(GL_LIGHT1);
 
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		GLfloat mat_diffuse[4] = { 1.0, 1.0, 0.0, 0.0 };
-		GLfloat mat_specular[] = { 1.0, 1.0, 1.0, 1.0 };
-		glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
-		glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
-		glMaterialf(GL_FRONT, GL_SHININESS, 50.0);
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			GLfloat mat_diffuse[4] = { 1.0, 1.0, 0.0, 0.0 };
+			GLfloat mat_specular[] = { 1.0, 1.0, 1.0, 1.0 };
+			glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
+			glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
+			glMaterialf(GL_FRONT, GL_SHININESS, 50.0);
 
-		for (int i = 0; i < poly->nquads; i++) {
-			Quad* temp_q = poly->qlist[i];
-			glBegin(GL_POLYGON);
-			for (int j = 0; j < 4; j++) {
-				Vertex* temp_v = temp_q->verts[j];
-				glNormal3d(temp_v->normal.entry[0], temp_v->normal.entry[1], temp_v->normal.entry[2]);
-				glVertex3d(temp_v->x, temp_v->y, temp_v->z);
+			for (int i = 0; i < poly->nquads; i++) {
+				Quad* temp_q = poly->qlist[i];
+				glBegin(GL_POLYGON);
+				for (int j = 0; j < 4; j++) {
+					Vertex* temp_v = temp_q->verts[j];
+					glNormal3d(temp_v->normal.entry[0], temp_v->normal.entry[1], temp_v->normal.entry[2]);
+					glVertex3d(temp_v->x, temp_v->y, temp_v->z);
+				}
+				glEnd();
 			}
-			glEnd();
-		}
 
-		CHECK_GL_ERROR();
-	}
-	break;
-
-	case 2:
-	{
-		glDisable(GL_LIGHTING);
-		glEnable(GL_LINE_SMOOTH);
-		glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		glLineWidth(1.0);
-		for (int i = 0; i < poly->nquads; i++) {
-			Quad* temp_q = poly->qlist[i];
-
-			glBegin(GL_POLYGON);
-			for (int j = 0; j < 4; j++) {
-				Vertex* temp_v = temp_q->verts[j];
-				glNormal3d(temp_q->normal.entry[0], temp_q->normal.entry[1], temp_q->normal.entry[2]);
-				glColor3f(0.0, 0.0, 0.0);
-				glVertex3d(temp_v->x, temp_v->y, temp_v->z);
-			}
-			glEnd();
-
-		}
-
-		glDisable(GL_BLEND);
-	}
-	break;
-
-	case 3:
-		glDisable(GL_LIGHTING);
-		for (int i = 0; i < poly->nquads; i++) {
-			Quad* temp_q = poly->qlist[i];
-			glBegin(GL_POLYGON);
-			for (int j = 0; j < 4; j++) {
-				Vertex* temp_v = temp_q->verts[j];
-				glColor3f(temp_v->R, temp_v->G, temp_v->B);
-				glVertex3d(temp_v->x, temp_v->y, temp_v->z);
-			}
-			glEnd();
+			CHECK_GL_ERROR();
 		}
 		break;
 
-	case 4:
-	{
-		//draw a dot at position (0.2, 0.3, 0.4) 
-		//with radius 0.1 in color blue(0.0, 0.0, 1.0)
-		drawDot(0.2, 0.3, 0.4, 0.1, 0.0, 0.0, 1.0);
+		case 2:
+		{
+			glDisable(GL_LIGHTING);
+			glEnable(GL_LINE_SMOOTH);
+			glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+			glLineWidth(1.0);
+			for (int i = 0; i < poly->nquads; i++) {
+				Quad* temp_q = poly->qlist[i];
 
-		//draw a dot at position of vlist[110]
-		//with radius 0.2 in color magenta (1.0, 0.0, 1.0)
-		Vertex *v = poly->vlist[110];
-		drawDot(v->x, v->y, v->z, 0.2, 1.0, 0.0, 1.0);
+				glBegin(GL_POLYGON);
+				for (int j = 0; j < 4; j++) {
+					Vertex* temp_v = temp_q->verts[j];
+					glNormal3d(temp_q->normal.entry[0], temp_q->normal.entry[1], temp_q->normal.entry[2]);
+					glColor3f(0.0, 0.0, 0.0);
+					glVertex3d(temp_v->x, temp_v->y, temp_v->z);
+				}
+				glEnd();
 
-		//draw line segment start at vlist[110] and end at (vlist[135]->x, vlist[135]->y, 4)
-		//with color (0.02, 0.1, 0.02) and width 1
-		LineSegment line(poly->vlist[110]->x, poly->vlist[110]->y, poly->vlist[110]->z,
-			poly->vlist[135]->x, poly->vlist[135]->y, 4);
-		drawLineSegment(line, 1.0, 0.0, 1.0, 0.0);
-
-		//draw a polyline of pentagon with color orange(1.0, 0.5, 0.0) and width 2
-		drawPolyline(pentagon, 2.0, 1.0, 0.5, 0.0);
-
-		//display the mesh with color cyan (0.0, 1.0, 1.0)
-		glDisable(GL_LIGHTING);
-		for (int i = 0; i < poly->nquads; i++) {
-			Quad* temp_q = poly->qlist[i];
-			glBegin(GL_POLYGON);
-			for (int j = 0; j < 4; j++) {
-				Vertex* temp_v = temp_q->verts[j];
-				glColor3f(0.0, 1.0, 1.0);
-				glVertex3d(temp_v->x, temp_v->y, temp_v->z);
 			}
-			glEnd();
-		}
-	}
-	break;
 
-	case 5:
-		displayIBFV();
+			glDisable(GL_BLEND);
+		}
+		break;
+
+		case 3:
+			glDisable(GL_LIGHTING);
+			for (int i = 0; i < poly->nquads; i++) {
+				Quad* temp_q = poly->qlist[i];
+				glBegin(GL_POLYGON);
+				for (int j = 0; j < 4; j++) {
+					Vertex* temp_v = temp_q->verts[j];
+					glColor3f(temp_v->R, temp_v->G, temp_v->B);
+					glVertex3d(temp_v->x, temp_v->y, temp_v->z);
+				}
+				glEnd();
+			}
+			break;
+
+		case 4:
+		{
+			//draw a dot at position (0.2, 0.3, 0.4) 
+			//with radius 0.1 in color blue(0.0, 0.0, 1.0)
+			drawDot(0.2, 0.3, 0.4, 0.1, 0.0, 0.0, 1.0);
+
+			//draw a dot at position of vlist[110]
+			//with radius 0.2 in color magenta (1.0, 0.0, 1.0)
+			Vertex *v = poly->vlist[110];
+			drawDot(v->x, v->y, v->z, 0.2, 1.0, 0.0, 1.0);
+
+			//draw line segment start at vlist[110] and end at (vlist[135]->x, vlist[135]->y, 4)
+			//with color (0.02, 0.1, 0.02) and width 1
+			LineSegment line(poly->vlist[110]->x, poly->vlist[110]->y, poly->vlist[110]->z,
+				poly->vlist[135]->x, poly->vlist[135]->y, 4);
+			drawLineSegment(line, 1.0, 0.0, 1.0, 0.0);
+
+			//draw a polyline of pentagon with color orange(1.0, 0.5, 0.0) and width 2
+			drawPolyline(pentagon, 2.0, 1.0, 0.5, 0.0);
+
+			//display the mesh with color cyan (0.0, 1.0, 1.0)
+			glDisable(GL_LIGHTING);
+			for (int i = 0; i < poly->nquads; i++) {
+				Quad* temp_q = poly->qlist[i];
+				glBegin(GL_POLYGON);
+				for (int j = 0; j < 4; j++) {
+					Vertex* temp_v = temp_q->verts[j];
+					glColor3f(0.0, 1.0, 1.0);
+					glVertex3d(temp_v->x, temp_v->y, temp_v->z);
+				}
+				glEnd();
+			}
+		}
+		break;
+
+		case 5:
+			displayIBFV();
+			break;
+
+		case 6: {
+			glDisable(GL_LIGHTING);
+			for (int i = 0; i < poly->nquads; i++) {
+				Quad* temp_q = poly->qlist[i];
+				glBegin(GL_POLYGON);
+				for (int j = 0; j < 4; j++) {
+					Vertex* temp_v = temp_q->verts[j];
+					glColor3f(temp_v->R, temp_v->G, temp_v->B);
+					glVertex3d(temp_v->x, temp_v->y, temp_v->z);
+				}
+				glEnd();
+			}
+		}
 		break;
 
 	case 6:

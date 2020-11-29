@@ -73,6 +73,8 @@ public:
 class Polyhedron {
 public:
 
+	int minx, maxx, miny, maxy;
+
 	Quad **qlist;		/* list of quads */
 	int nquads;
 	int max_quads;
@@ -116,6 +118,7 @@ public:
 	/*utilties*/
 	Quad* find_common_edge(Quad*, Vertex*, Vertex*);
 	Quad* other_quad(Edge*, Quad*);
+	void changeFile(FILE* file);
 
 	/*feel free to add more to help youself*/
 	void write_info();
