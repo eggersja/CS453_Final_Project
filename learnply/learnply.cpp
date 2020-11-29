@@ -27,10 +27,6 @@ using std::string;
 Polyhedron* poly;
 
 /* random globals */
-bool showPickedPoint = false;
-bool showSingularities = false;
-bool showAllStreamlines = false;
-icVector3 pickedPoint;
 PolyLine streamline_picked;
 vector<PolyLine> streamlines;
 
@@ -62,7 +58,7 @@ const char* LOAD_PATHS[LOADABLE_COUNT] = {
 	"../datasets/proc_boids_basic/basic.t5.boids.ply", // 4
 	"../datasets/proc_boids_basic/basic.t6.boids.ply", // 5
 	"../datasets/proc_boids_basic/basic.t7.boids.ply", // 6
-	"../datasets/proc_boids_basic/basic.t8.boids.ply" // 7
+	"../datasets/proc_boids_basic/basic.t8.boids.ply"  // 7
 };
 
 /// <summary>
@@ -1237,8 +1233,8 @@ void keyboard(unsigned char key, int x, int y) {
 	}
 	break;
 
-  // Increment the load
-	case 'x':
+    // Increment the load
+	case 'x': {
 		poly->finalize();
 		load_selector = (load_selector + 1) % LOADABLE_COUNT;
 		char buffer[256];
@@ -1248,7 +1244,8 @@ void keyboard(unsigned char key, int x, int y) {
 		poly->write_info();
 		makePatterns();
 		printf("Loaded set %d (%s).\n", load_selector, buffer);
-		break;
+	}
+	break;
 
 	case 'r':
 		mat_ident(rotmat);
@@ -1389,40 +1386,25 @@ void display_polyhedron(Polyhedron* poly)
 			break;
 
 		case 6: {
-			glDisable(GL_LIGHTING);
+			/*glEnable(GL_LIGHTING);
+			glEnable(GL_LIGHT0);
+			glEnable(GL_LIGHT1);
+
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			GLfloat mat_diffuse[4] = { 1.0, 1.0, 0.0, 0.0 };
+			GLfloat mat_specular[] = { 1.0, 1.0, 1.0, 1.0 };
+			glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
+			glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
+			glMaterialf(GL_FRONT, GL_SHININESS, 50.0);*/
+
 			for (int i = 0; i < poly->nquads; i++) {
 				Quad* temp_q = poly->qlist[i];
-				glBegin(GL_POLYGON);
-				for (int j = 0; j < 4; j++) {
-					Vertex* temp_v = temp_q->verts[j];
-					glColor3f(temp_v->R, temp_v->G, temp_v->B);
-					glVertex3d(temp_v->x, temp_v->y, temp_v->z);
-				}
-				glEnd();
+				display_grayscale_heightmod_quad(temp_q, lower, upper, 0);
 			}
+
+			CHECK_GL_ERROR();
 		}
-		break;
-
-	case 6:
-		/*glEnable(GL_LIGHTING);
-		glEnable(GL_LIGHT0);
-		glEnable(GL_LIGHT1);
-
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		GLfloat mat_diffuse[4] = { 1.0, 1.0, 0.0, 0.0 };
-		GLfloat mat_specular[] = { 1.0, 1.0, 1.0, 1.0 };
-		glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
-		glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
-		glMaterialf(GL_FRONT, GL_SHININESS, 50.0);*/
-
-		for (int i = 0; i < poly->nquads; i++) {
-			Quad* temp_q = poly->qlist[i];
-			display_grayscale_heightmod_quad(temp_q, lower, upper, 0);
-		}
-
-		CHECK_GL_ERROR();
-
-		break;
+		break;		
 	}
 }
 
