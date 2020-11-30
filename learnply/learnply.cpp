@@ -46,7 +46,7 @@ bool scene_lights_on = true;
 
 /*file management related variables*/
 /// <remarks>Must equal the number of items in the array declared below.</remarks>
-const int LOADABLE_COUNT = 8;
+const int LOADABLE_COUNT = 7;
 
 /// <summary>
 /// An array containing all of the paths to the files to load. Can be iterated through with <see cref="keyboard(unsigned char key, int x, int y)">'x'</see>
@@ -55,20 +55,19 @@ const int LOADABLE_COUNT = 8;
 /// "../quadmesh_2D/fun_shapes/face.ply" for dummy
 /// </remarks>
 const char* LOAD_PATHS[LOADABLE_COUNT] = {
-	"../datasets/proc_boids_basic/basic.t1.boids.ply", // 0
-	"../datasets/proc_boids_basic/basic.t2.boids.ply", // 1
-	"../datasets/proc_boids_basic/basic.t3.boids.ply", // 2
-	"../datasets/proc_boids_basic/basic.t4.boids.ply", // 3
-	"../datasets/proc_boids_basic/basic.t5.boids.ply", // 4
-	"../datasets/proc_boids_basic/basic.t6.boids.ply", // 5
-	"../datasets/proc_boids_basic/basic.t7.boids.ply", // 6
-	"../datasets/proc_boids_basic/basic.t8.boids.ply"  // 7
+	"../datasets/proc_boids_ts/long.boids.ply",   // 0
+	"../datasets/proc_boids_ts/long2.boids.ply",  // 1
+	"../datasets/proc_boids_ts/long4.boids.ply",  // 2
+	"../datasets/proc_boids_ts/long8.boids.ply",  // 3
+	"../datasets/proc_boids_ts/long16.boids.ply", // 4
+	"../datasets/proc_boids_ts/long32.boids.ply", // 5
+	"../datasets/proc_boids_ts/long64.boids.ply"  // 6
 };
 
 /// <summary>
 /// Determines which scalar load path to use. Acceptable values are 0-7
 /// </summary>
-int load_selector = 4;
+int load_selector = 0;
 
 /*
 Use keys 1 to 0 to switch among different display modes.
