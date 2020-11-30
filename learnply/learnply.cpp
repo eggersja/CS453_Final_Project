@@ -28,7 +28,7 @@ Polyhedron* poly;
 
 /* random globals */
 vector<PolyLine> streamlines;
-vector<Vertex*> vectors;
+vector<LineSegment> vectors;
 bool displayStreamlines = false;
 
 /*scene related variables*/
@@ -975,7 +975,6 @@ void display(void)
 	CHECK_GL_ERROR();
 }
 
-
 /******************************************************************************
 Collects a bunch of streamlines in a mesh
 ******************************************************************************/
@@ -1000,11 +999,31 @@ Collects a bunch of vectors in a mesh
 void gatherVectors() {
 	vectors.clear();
 	int vertsPerRow = sqrt(poly->nverts);
+	double maxScalar = poly->vlist[0]->scalar;
 
+	// get max scalar to use as ratio for vector length normalization
+	for (int i = 0; i < poly->nverts; i++)
+		if (poly->vlist[i]->scalar > maxScalar)
+			maxScalar = poly->vlist[i]->scalar;
+
+	// gather vectors
+	// only doing the interior rows (ignoring outer ring)
 	for (int i = vertsPerRow + 1; i < poly->nverts - vertsPerRow - 1; i++) {
-		if ( (i % vertsPerRow != 0) && ((i + 1)  % vertsPerRow != 0) )
-			if (poly->vlist[i]->scalar)
-				vectors.push_back(poly->vlist[i]);
+		if ((i % vertsPerRow != 0) && ((i + 1) % vertsPerRow != 0)) {
+			Vertex* v = poly->vlist[i];
+
+			if (v->scalar > 1) {
+				double vLen = (v->scalar / maxScalar) * 1.5;
+
+				icVector3 dir = getDir(v->x, v->y, v->z);
+				normalize(dir);
+				icVector3 start = icVector3(v->x, v->y, v->z);
+				icVector3 end = icVector3(v->x + (dir.x * vLen), v->y + (dir.y * vLen), v->x + (dir.y * vLen));
+
+				LineSegment line = LineSegment(start, end);
+				vectors.push_back(line);
+			}
+		}
 	}
 }
 
@@ -1218,28 +1237,20 @@ void keyboard(unsigned char key, int x, int y) {
 		break;
 
 	// vector field
-	case '7': {
+	case '7':
 		display_mode = 7;
-		
 		if (!vectors.size())
 			gatherVectors();
-
 		glutPostRedisplay();
-	}
-	break;
+		break;
 
-	// streamlines
-	case 't': {
-		if (displayStreamlines)
-			streamlines.clear();
-		else {
+	// streamlines (broken)
+	case '8':
+		display_mode = 8;
+		if (!streamlines.size())
 			gatherStreamlines();
-			cout << "Displaying streamlines...\n";
-		}
-		
-		displayStreamlines = !displayStreamlines;
-	}
-	break;
+		glutPostRedisplay();
+		break;
 
     // Increment the load
 	case 'x': {
@@ -1251,8 +1262,8 @@ void keyboard(unsigned char key, int x, int y) {
 		poly->initialize(); // initialize the mesh
 		// poly->write_info();
 		makePatterns();
-		if (displayStreamlines) gatherStreamlines();
 		if (display_mode == 7) gatherVectors();
+		if (display_mode == 8) gatherStreamlines();
 		printf("Loaded set %d (%s).\n", load_selector, buffer);
 		
 	}
@@ -1310,12 +1321,6 @@ void display_polyhedron(Polyhedron* poly)
 					glVertex3d(temp_v->x, temp_v->y, temp_v->z);
 				}
 				glEnd();
-			}
-
-			// doesn't work? not sure why
-			if (displayStreamlines) {
-				for (int i = 0; i < streamlines.size(); i++)
-					drawPolyline(streamlines[i], 2.0, 1.0, 0.0, 0.0);
 			}
 
 			CHECK_GL_ERROR();
@@ -1415,7 +1420,26 @@ void display_polyhedron(Polyhedron* poly)
 		
 		case 7: {
 			for (int i = 0; i < vectors.size(); i++)
-				drawDot(vectors.at(i)->x, vectors.at(i)->y, 0, 0.25, 1, 1, 1);
+				drawLineSegment(vectors.at(i), 0.5, 1, 1, 1);
+			//drawDot(vectors.at(i)->x, vectors.at(i)->y, 0, 0.25, 1, 1, 1);
+
+			glDisable(GL_LIGHTING);
+			for (int i = 0; i < poly->nquads; i++) {
+				Quad* temp_q = poly->qlist[i];
+				glBegin(GL_POLYGON);
+				for (int j = 0; j < 4; j++) {
+					Vertex* temp_v = temp_q->verts[j];
+					glColor3f(0.0, 0.0, 0.0);
+					glVertex3d(temp_v->x, temp_v->y, temp_v->z);
+				}
+				glEnd();
+			}
+		}
+		break;
+
+		case 8: {
+			for (int i = 0; i < streamlines.size(); i++)
+				drawPolyline(streamlines[i], 1, 1, 1, 1);
 
 			glDisable(GL_LIGHTING);
 			for (int i = 0; i < poly->nquads; i++) {
