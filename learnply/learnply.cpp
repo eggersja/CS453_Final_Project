@@ -1018,6 +1018,9 @@ void gatherVectors() {
 				icVector3 start = icVector3(v->x, v->y, v->z);
 				icVector3 end = icVector3(v->x + (dir.x * vLen), v->y + (dir.y * vLen), v->x + (dir.y * vLen));
 
+				//double mag = sqrt(pow((end.x - start.x), 2) + pow((end.y, start.y), 2));
+				//if (start.x < 0) cout << mag << " (" << start.x << ", " << start.y << ") | ";
+
 				LineSegment line = LineSegment(start, end);
 				vectors.push_back(line);
 			}
@@ -1418,8 +1421,7 @@ void display_polyhedron(Polyhedron* poly)
 		
 		case 7: {
 			for (int i = 0; i < vectors.size(); i++)
-				drawLineSegment(vectors.at(i), 0.5, 1, 1, 1);
-			//drawDot(vectors.at(i)->x, vectors.at(i)->y, 0, 0.25, 1, 1, 1);
+				drawLineSegment(vectors.at(i), 0.25, 1, 1, 1);
 
 			glDisable(GL_LIGHTING);
 			for (int i = 0; i < poly->nquads; i++) {
