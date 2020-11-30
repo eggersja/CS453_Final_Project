@@ -27,8 +27,9 @@ using std::string;
 Polyhedron* poly;
 
 /* random globals */
-PolyLine streamline_picked;
 vector<PolyLine> streamlines;
+vector<LineSegment> vectors;
+bool displayStreamlines = false;
 
 /*scene related variables*/
 const float zoomspeed = 0.9;
@@ -37,6 +38,9 @@ const double radius_factor = 1.0;
 int win_width = 800;
 int win_height = 800;
 float aspectRatio = win_width / win_height;
+const double VECTOR_LENGTH_SCALAR = 1.5; // Used for point array vector field visualization
+const double ARROWHEAD_LENGTH = 0.15;
+const double ARROWHEAD_ANGLE = PI / 4;
 
 bool scene_lights_on = true;
 
@@ -64,7 +68,7 @@ const char* LOAD_PATHS[LOADABLE_COUNT] = {
 /// <summary>
 /// Determines which scalar load path to use. Acceptable values are 0-7
 /// </summary>
-int load_selector = 0;
+int load_selector = 4;
 
 /*
 Use keys 1 to 0 to switch among different display modes.
@@ -113,9 +117,11 @@ void init(void);
 void makePatterns(void);
 
 /* custom functions */
-void updatePolyFile(bool increase);
 void extract_streamline(double, double, double, PolyLine&);
+double magnitude(Vertex* v);
 icVector3 getDir(double, double, double);
+void gatherStreamlines();
+void gatherVectors(Polyhedron * poly);
 
 /*glut attaching functions*/
 void keyboard(unsigned char key, int x, int y);
@@ -133,6 +139,8 @@ void display_selected_quad(Polyhedron* poly);
 
 /*display vis results*/
 void display_polyhedron(Polyhedron* poly);
+
+void drawArrowhead(LineSegment& vectorArrow);
 
 /*display utilities*/
 
@@ -263,7 +271,7 @@ int main(int argc, char* argv[])
 	
 	/*initialize the mesh*/
 	poly->initialize(); // initialize the mesh
-	poly->write_info();
+	// poly->write_info();
 
 
 	/*init glut and create window*/
@@ -378,7 +386,6 @@ void set_scene(GLenum mode, Polyhedron* poly)
 	glTranslatef(-poly->center.entry[0], -poly->center.entry[1], -poly->center.entry[2]);
 }
 
-
 /******************************************************************************
 Init scene
 ******************************************************************************/
@@ -405,7 +412,6 @@ void init(void) {
 	else
 		glFrontFace(GL_CCW);
 }
-
 
 /******************************************************************************
 Pick objects from the scene
@@ -974,34 +980,68 @@ void display(void)
 }
 
 /******************************************************************************
-Change the current polygon file to display new information
-NOTE: broken
+Collects a bunch of streamlines in a mesh
 ******************************************************************************/
 
-void updatePolyFile(bool increase) {
-	// change t
-	if (increase) {
-		if (current_t == MAX_T)
-			current_t = MIN_T;
-		else
-			current_t++;
-	} else {
-		if (current_t == MIN_T)
-			current_t = MAX_T;
-		else
-			current_t--;
+void gatherStreamlines() {
+	streamlines.clear();
+
+	for (int i = 0; i < poly->nverts; i += 3) {
+		int x = poly->vlist[i]->x;
+		int y = poly->vlist[i]->y;
+
+		PolyLine line;
+		extract_streamline(x, y, 0, line);
+		streamlines.push_back(line);
 	}
+}
 
-	// update poly file
-	string file_str = "../datasets/proc_boids_basic/basic.t" + std::to_string(current_t) + ".boids.ply"; // won't work, needs a const
-	FILE* this_file = fopen("../datasets/proc_boids_basic/basic.t11.boids.ply", "r"); // poly class is annoying
-	poly = new Polyhedron(this_file);
-	fclose(this_file);
+/******************************************************************************
+Collects a bunch of vectors in a mesh
+******************************************************************************/
 
-	// re-init mesh
-	poly->initialize(); // initialize the mesh
-	cout << "T: " << current_t << endl;
-	poly->write_info();
+void gatherVectors(Polyhedron * poly) {
+	vectors.clear();
+	int vertsPerRow = sqrt(poly->nverts);
+	double maxMagnitude = magnitude(poly->vlist[0]); // MinScalar = 0
+
+	// get max scalar to use as ratio for vector length normalization
+	for (int i = 0; i < poly->nverts; i++)
+		if (magnitude(poly->vlist[i]) > maxMagnitude)
+			maxMagnitude = magnitude(poly->vlist[i]);
+
+	// gather vectors
+	// only doing the interior rows (ignoring outer ring)
+	for (int i = vertsPerRow + 1; i < poly->nverts - vertsPerRow - 1; i++) {
+		if ((i % vertsPerRow != 0) && ((i + 1) % vertsPerRow != 0)) {
+			Vertex* v = poly->vlist[i];
+			double vMagnitude = magnitude(v);
+
+			if (vMagnitude > 1) {
+				double vLen = (vMagnitude / maxMagnitude) * VECTOR_LENGTH_SCALAR;
+
+				icVector3 dir = icVector3(v->vx, v->vy, v->vz); // v->vx != v->x
+				normalize(dir);
+				icVector3 start = icVector3(v->x, v->y, v->z);
+				icVector3 end = icVector3(v->x + (dir.x * vLen), v->y + (dir.y * vLen), v->z + (dir.z * vLen));
+
+				LineSegment line = LineSegment(start, end);
+				vectors.push_back(line);
+			}
+		}
+	}
+}
+
+/// <summary>
+/// Determines the magnitude of the vector associated with a vertex.
+/// </summary>
+/// <param name="v">The vertex to find the magnitude of.</param>
+/// <returns>The magnitude of the vector associated with the vertex.</returns>
+/// <remarks>Previous issue is that the magnitude of vectors was assumed to be the scalar value, which it was not.
+/// <see href="https://drive.google.com/drive/u/1/folders/1xIMR06voeJv3fISd5TrDHu-p9JBVuhKc"/></remarks>
+double magnitude(Vertex* v)
+{
+	return sqrt((v->vx * v->vx) + (v->vy * v->vy) + (v->vz * v->vz));
 }
 
 /******************************************************************************
@@ -1214,24 +1254,18 @@ void keyboard(unsigned char key, int x, int y) {
 		break;
 
 	// vector field
-	case '7': {
+	case '7':
 		display_mode = 7;
-
-
-
 		glutPostRedisplay();
-	}
-	break;
+		break;
 
-	// streamlines
-	case '8': {
+	// streamlines (broken)
+	case '8':
 		display_mode = 8;
-
-
-
+		if (!streamlines.size())
+			gatherStreamlines();
 		glutPostRedisplay();
-	}
-	break;
+		break;
 
     // Increment the load
 	case 'x': {
@@ -1241,9 +1275,12 @@ void keyboard(unsigned char key, int x, int y) {
 		strcpy(buffer, LOAD_PATHS[load_selector]);
 		load_ply(buffer);
 		poly->initialize(); // initialize the mesh
-		poly->write_info();
+		// poly->write_info();
 		makePatterns();
+		gatherVectors(poly);
+		if (display_mode == 8) gatherStreamlines();
 		printf("Loaded set %d (%s).\n", load_selector, buffer);
+		
 	}
 	break;
 
@@ -1275,6 +1312,8 @@ void display_polyhedron(Polyhedron* poly)
 
 	double lower, upper;
 	scalar_bounds(poly, &lower, &upper); // Find bounds
+	if (!vectors.size())
+		gatherVectors(poly);
 
 	switch (display_mode) {
 		case 1:
@@ -1386,26 +1425,85 @@ void display_polyhedron(Polyhedron* poly)
 			break;
 
 		case 6: {
-			/*glEnable(GL_LIGHTING);
-			glEnable(GL_LIGHT0);
-			glEnable(GL_LIGHT1);
-
-			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-			GLfloat mat_diffuse[4] = { 1.0, 1.0, 0.0, 0.0 };
-			GLfloat mat_specular[] = { 1.0, 1.0, 1.0, 1.0 };
-			glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
-			glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
-			glMaterialf(GL_FRONT, GL_SHININESS, 50.0);*/
+			float red[3]  = { 1.0, 0.0, 0.0 };
+			float blue[3] = { 0.0, 0.0, 1.0 };
 
 			for (int i = 0; i < poly->nquads; i++) {
 				Quad* temp_q = poly->qlist[i];
-				display_grayscale_heightmod_quad(temp_q, lower, upper, 0);
+				display_bicolor_quad(temp_q, lower, upper, red, blue);
 			}
-
-			CHECK_GL_ERROR();
 		}
-		break;		
+		break;
+		
+		case 7: {
+			glDisable(GL_LIGHTING);
+			for (int i = 0; i < poly->nquads; i++) {
+				Quad* temp_q = poly->qlist[i];
+				glBegin(GL_POLYGON);
+				for (int j = 0; j < 4; j++) {
+					Vertex* temp_v = temp_q->verts[j];
+					glColor3f(0.0, 0.0, 0.0);
+					glVertex3d(temp_v->x, temp_v->y, temp_v->z);
+				}
+				glEnd();
+			}
+			if (!vectors.size()) // Draw things to appear on top after
+				gatherVectors(poly);
+			for (int i = 0; i < vectors.size(); i++)
+			{
+				LineSegment vectorArrow = vectors.at(i);
+				drawLineSegment(vectorArrow, 0.25, 1, 1, 1);
+				if (vectorArrow.len > ARROWHEAD_LENGTH * VECTOR_LENGTH_SCALAR)
+				{ // If this is a long arrow, add a short arrowhead to it.
+					// This does not take into account the Z dimension
+					drawArrowhead(vectorArrow);
+				}
+			}
+		}
+		break;
+
+		case 8: {
+			for (int i = 0; i < streamlines.size(); i++)
+				drawPolyline(streamlines[i], 1, 1, 1, 1);
+
+			glDisable(GL_LIGHTING);
+			for (int i = 0; i < poly->nquads; i++) {
+				Quad* temp_q = poly->qlist[i];
+				glBegin(GL_POLYGON);
+				for (int j = 0; j < 4; j++) {
+					Vertex* temp_v = temp_q->verts[j];
+					glColor3f(0.0, 0.0, 0.0);
+					glVertex3d(temp_v->x, temp_v->y, temp_v->z);
+				}
+				glEnd();
+			}
+		}
+		break;
 	}
+}
+
+/// <summary>
+/// Draws an arrowhead associated with a line segment. Assumes directionality of the line segment runs from "start" to "end".
+/// </summary>
+/// <param name="vectorArrow">The arrow to draw a head on.</param>
+/// <remarks>To improve performance, these arrowheads should instead be calculated at the same time as <see cref="gatherVectors(Polyhedron *)"/></remarks>
+void drawArrowhead(LineSegment& vectorArrow)
+{
+	icVector3 tip = vectorArrow.end;
+	icVector3 base = vectorArrow.start;
+	double width = tip.x - base.x;
+	double height = tip.y - base.y;
+	double innerVectorAngle = atan(height / width);
+	if (width < 0)
+		innerVectorAngle += PI; // arctan won't produce an angle between PI/2 and 3PI/2, but we want this.
+	double leftArrowHeadAngle = PI + innerVectorAngle - ARROWHEAD_ANGLE;
+	double rightArrowHeadAngle = PI + innerVectorAngle + ARROWHEAD_ANGLE;
+	icVector3 leftArrowHeadTip(tip.x + ARROWHEAD_LENGTH * cos(leftArrowHeadAngle), tip.y + ARROWHEAD_LENGTH * sin(leftArrowHeadAngle), tip.z);
+	icVector3 rightArrowHeadTip(tip.x + ARROWHEAD_LENGTH * cos(rightArrowHeadAngle), tip.y + ARROWHEAD_LENGTH * sin(rightArrowHeadAngle), tip.z);
+	LineSegment leftArrowHead(tip, leftArrowHeadTip);
+	LineSegment rightArrowHead(tip, rightArrowHeadTip);
+	drawLineSegment(leftArrowHead, 0.25, 1, 1, 1);
+	drawLineSegment(rightArrowHead, 0.25, 1, 1, 1);
 }
 
 /******************************************************************************
