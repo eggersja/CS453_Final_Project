@@ -38,6 +38,7 @@ const double radius_factor = 1.0;
 int win_width = 800;
 int win_height = 800;
 float aspectRatio = win_width / win_height;
+const double VECTOR_LENGTH_SCALAR = 1.5; // Used for point array vector field visualization
 
 bool scene_lights_on = true;
 
@@ -115,9 +116,10 @@ void makePatterns(void);
 
 /* custom functions */
 void extract_streamline(double, double, double, PolyLine&);
+double magnitude(Vertex* v);
 icVector3 getDir(double, double, double);
 void gatherStreamlines();
-void gatherVectors();
+void gatherVectors(Polyhedron * poly);
 
 /*glut attaching functions*/
 void keyboard(unsigned char key, int x, int y);
@@ -994,38 +996,48 @@ void gatherStreamlines() {
 Collects a bunch of vectors in a mesh
 ******************************************************************************/
 
-void gatherVectors() {
+void gatherVectors(Polyhedron * poly) {
 	vectors.clear();
 	int vertsPerRow = sqrt(poly->nverts);
-	double maxScalar = poly->vlist[0]->scalar;
+	double maxMagnitude = magnitude(poly->vlist[0]); // MinScalar = 0
 
 	// get max scalar to use as ratio for vector length normalization
 	for (int i = 0; i < poly->nverts; i++)
-		if (poly->vlist[i]->scalar > maxScalar)
-			maxScalar = poly->vlist[i]->scalar;
+		if (magnitude(poly->vlist[i]) > maxMagnitude)
+			maxMagnitude = magnitude(poly->vlist[i]);
 
 	// gather vectors
 	// only doing the interior rows (ignoring outer ring)
 	for (int i = vertsPerRow + 1; i < poly->nverts - vertsPerRow - 1; i++) {
 		if ((i % vertsPerRow != 0) && ((i + 1) % vertsPerRow != 0)) {
 			Vertex* v = poly->vlist[i];
+			double vMagnitude = magnitude(v);
 
-			if (v->scalar > 1) {
-				double vLen = (v->scalar / maxScalar) * 1.5;
+			if (vMagnitude > 1) {
+				double vLen = (vMagnitude / maxMagnitude) * VECTOR_LENGTH_SCALAR;
 
-				icVector3 dir = getDir(v->x, v->y, v->z);
+				icVector3 dir = icVector3(v->vx, v->vy, v->vz); // v->vx != v->x
 				normalize(dir);
 				icVector3 start = icVector3(v->x, v->y, v->z);
-				icVector3 end = icVector3(v->x + (dir.x * vLen), v->y + (dir.y * vLen), v->x + (dir.y * vLen));
-
-				//double mag = sqrt(pow((end.x - start.x), 2) + pow((end.y, start.y), 2));
-				//if (start.x < 0) cout << mag << " (" << start.x << ", " << start.y << ") | ";
+				icVector3 end = icVector3(v->x + (dir.x * vLen), v->y + (dir.y * vLen), v->z + (dir.z * vLen));
 
 				LineSegment line = LineSegment(start, end);
 				vectors.push_back(line);
 			}
 		}
 	}
+}
+
+/// <summary>
+/// Determines the magnitude of the vector associated with a vertex.
+/// </summary>
+/// <param name="v">The vertex to find the magnitude of.</param>
+/// <returns>The magnitude of the vector associated with the vertex.</returns>
+/// <remarks>Previous issue is that the magnitude of vectors was assumed to be the scalar value, which it was not.
+/// <see href="https://drive.google.com/drive/u/1/folders/1xIMR06voeJv3fISd5TrDHu-p9JBVuhKc"/></remarks>
+double magnitude(Vertex* v)
+{
+	return sqrt((v->vx * v->vx) + (v->vy * v->vy) + (v->vz * v->vz));
 }
 
 /******************************************************************************
@@ -1240,8 +1252,6 @@ void keyboard(unsigned char key, int x, int y) {
 	// vector field
 	case '7':
 		display_mode = 7;
-		if (!vectors.size())
-			gatherVectors();
 		glutPostRedisplay();
 		break;
 
@@ -1263,7 +1273,7 @@ void keyboard(unsigned char key, int x, int y) {
 		poly->initialize(); // initialize the mesh
 		// poly->write_info();
 		makePatterns();
-		if (display_mode == 7) gatherVectors();
+		gatherVectors(poly);
 		if (display_mode == 8) gatherStreamlines();
 		printf("Loaded set %d (%s).\n", load_selector, buffer);
 		
@@ -1298,6 +1308,8 @@ void display_polyhedron(Polyhedron* poly)
 
 	double lower, upper;
 	scalar_bounds(poly, &lower, &upper); // Find bounds
+	if (!vectors.size())
+		gatherVectors(poly);
 
 	switch (display_mode) {
 		case 1:
@@ -1420,9 +1432,6 @@ void display_polyhedron(Polyhedron* poly)
 		break;
 		
 		case 7: {
-			for (int i = 0; i < vectors.size(); i++)
-				drawLineSegment(vectors.at(i), 0.25, 1, 1, 1);
-
 			glDisable(GL_LIGHTING);
 			for (int i = 0; i < poly->nquads; i++) {
 				Quad* temp_q = poly->qlist[i];
@@ -1434,6 +1443,10 @@ void display_polyhedron(Polyhedron* poly)
 				}
 				glEnd();
 			}
+			if (!vectors.size()) // Draw things to appear on top after
+				gatherVectors(poly);
+			for (int i = 0; i < vectors.size(); i++)
+				drawLineSegment(vectors.at(i), 0.25, 1, 1, 1);
 		}
 		break;
 
