@@ -65,7 +65,7 @@ const char* LOAD_PATHS[LOADABLE_COUNT] = {
 /// <summary>
 /// Determines which scalar load path to use. Acceptable values are 0-7
 /// </summary>
-int load_selector = 0;
+int load_selector = 4;
 
 /*
 Use keys 1 to 0 to switch among different display modes.
@@ -380,7 +380,6 @@ void set_scene(GLenum mode, Polyhedron* poly)
 	glTranslatef(-poly->center.entry[0], -poly->center.entry[1], -poly->center.entry[2]);
 }
 
-
 /******************************************************************************
 Init scene
 ******************************************************************************/
@@ -407,7 +406,6 @@ void init(void) {
 	else
 		glFrontFace(GL_CCW);
 }
-
 
 /******************************************************************************
 Pick objects from the scene
